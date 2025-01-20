@@ -1,4 +1,4 @@
-package Forum
+package database
 
 import (
 	"database/sql"
@@ -15,7 +15,7 @@ var DBInstance DataBase
 
 func InitDB() error {
 	var err error
-	DBInstance.DB, err = sql.Open("sqlite3", "Forum.db")
+	DBInstance.DB, err = sql.Open("sqlite3", "Real-Time-Forum.db")
 	if err != nil {
 		return fmt.Errorf("error opening database: %v", err)
 	}
