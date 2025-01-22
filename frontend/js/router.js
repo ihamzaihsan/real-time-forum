@@ -14,21 +14,25 @@ function homeContent() {
     `;
 }
 
+import { handleRegisterSubmit } from './register.js';
+
 // Register page content function
 function registerContent() {
     document.getElementById('content').innerHTML = `
         <h1>Register</h1>
         <form id="registerForm">
             <input type="text" id="username" placeholder="Username" required><br> 
-        <input type="email" id="email" placeholder="Email" required><br>
-        <input type="password" id="password" placeholder="Password" required><br>
-        <input type="text" id="first_name" placeholder="First Name" required><br>
-        <input type="text" id="last_name" placeholder="Last Name" required><br>
-        <input type="number" id="age" placeholder="Age" required><br>
-        <input type="text" id="gender" placeholder="Gender" required><br>
+            <input type="email" id="email" placeholder="Email" required><br>
+            <input type="password" id="password" placeholder="Password" required><br>
+            <input type="text" id="first_name" placeholder="First Name" required><br>
+            <input type="text" id="last_name" placeholder="Last Name" required><br>
+            <input type="number" id="age" placeholder="Age" required><br>
+            <input type="text" id="gender" placeholder="Gender" required><br>
             <button type="submit">Register</button>
         </form>
     `;
+
+    document.getElementById('registerForm').addEventListener('submit', handleRegisterSubmit);
 }
 
 // Handle navigation when a link is clicked
