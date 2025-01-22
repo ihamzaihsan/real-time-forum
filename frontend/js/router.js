@@ -27,7 +27,13 @@ function registerContent() {
             <input type="text" id="first_name" placeholder="First Name" required><br>
             <input type="text" id="last_name" placeholder="Last Name" required><br>
             <input type="number" id="age" placeholder="Age" required><br>
-            <input type="text" id="gender" placeholder="Gender" required><br>
+            <div class="gender-selection">
+                <label>Gender:</label>
+                <input type="radio" id="male" name="gender" value="male" required>
+                <label for="male">Male</label>
+                <input type="radio" id="female" name="gender" value="female" required>
+                <label for="female">Female</label>
+            </div>
             <button type="submit">Register</button>
         </form>
     `;
@@ -67,3 +73,24 @@ function initRouter() {
 
 // Expose initRouter for use in app.js
 export { initRouter };
+
+
+
+
+function displayErrors(errors) {
+    // Create or get error container
+    let errorContainer = document.getElementById('error-container');
+    if (!errorContainer) {
+        errorContainer = document.createElement('div');
+        errorContainer.id = 'error-container';
+        errorContainer.style.color = 'red';
+        errorContainer.style.marginBottom = '10px';
+        const form = document.getElementById('registerForm');
+        form.insertBefore(errorContainer, form.firstChild);
+    }
+    
+    // Display errors
+    errorContainer.innerHTML = errors.map(error => `<p>${error}</p>`).join('');
+
+}
+export { displayErrors };

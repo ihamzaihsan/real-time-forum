@@ -1,9 +1,10 @@
 package handlers
 
 import (
-	models "RTF/models"
 	database "RTF/database"
+	models "RTF/models"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -11,30 +12,58 @@ import (
 )
 
 func ServeRegister(w http.ResponseWriter, r *http.Request) {
-	var user models.User
+    var user models.User
 
-	// Decode the incoming JSON data
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
+    // Decode the incoming JSON data
+    if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+        http.Error(w, "Invalid input", http.StatusBadRequest)
+        return
+    }
 
-	// Validate input (you can extend this validation)
-	if user.Username == "" || user.Email == "" || user.Password == "" {
-		http.Error(w, "Username, email, and password are required", http.StatusBadRequest)
-		return
-	}
+    log.Println(user)
 
-	// Register the user by calling the RegisterUser function
-	if err := RegisterUser(&user); err != nil {
-		http.Error(w, "Error registering user", http.StatusInternalServerError)
-		return
-	}
+    // Validate required fields
+    if user.Username == "" || user.Email == "" || user.Password == "" {
+        http.Error(w, "Username, email, and password are required", http.StatusBadRequest)
+        log.Println(user.Password)
+        return
+    }
 
-	// Send a success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"})
+    // Check if username exists
+    var count int
+    err := database.DBInstance.DB.QueryRow("SELECT COUNT(*) FROM users WHERE username = ?", user.Username).Scan(&count)
+    if err != nil {
+        http.Error(w, "Database error", http.StatusInternalServerError)
+        return
+    }
+    if count > 0 {
+        http.Error(w, "Username already exists", http.StatusConflict)
+        return
+    }
+
+    // Check if email exists
+    err = database.DBInstance.DB.QueryRow("SELECT COUNT(*) FROM users WHERE email = ?", user.Email).Scan(&count)
+    if err != nil {
+        http.Error(w, "Database error", http.StatusInternalServerError)
+        return
+    }
+    if count > 0 {
+        http.Error(w, "Email already exists", http.StatusConflict)
+        return
+    }
+
+    // Register the user
+    if err := RegisterUser(&user); err != nil {
+        http.Error(w, "Error registering user", http.StatusInternalServerError)
+        log.Println(err)
+        return
+    }
+
+    // Send success response
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"})
 }
+
 
 func RegisterUser(user *models.User) error {
 	// Hash the password before storing it
