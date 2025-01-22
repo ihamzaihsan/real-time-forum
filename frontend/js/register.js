@@ -52,6 +52,12 @@ export async function handleRegisterSubmit(event) {
         });
 
         if (response.ok) {
+            // Send a WebSocket message after successful registration
+            const socket = new WebSocket('ws://localhost:8080/ws');
+            socket.onopen = () => {
+                socket.send(JSON.stringify({ type: 'register', data: userData }));
+            };
+
             window.location.href = '/';
         } else {
             const error = await response.text();
