@@ -52,16 +52,24 @@ export async function handleRegisterSubmit(event) {
         });
 
         if (response.ok) {
-            // Send a WebSocket message after successful registration
-            const socket = new WebSocket('ws://localhost:8080/ws');
-            socket.onopen = () => {
-                socket.send(JSON.stringify({ type: 'register', data: userData }));
-            };
+            const result = await response.json();
+            localStorage.setItem('sessionToken', result.token);
+            
+            // Hide the register form
+            document.getElementById('registerForm').style.display = 'none';
+            
+            // Show success message
+            const content = document.getElementById('content');
+            content.innerHTML += `
+                <div class="success-message">
+                    Registration successful! Redirecting to home page...
+                </div>
+            `;
 
-            window.location.href = '/';
-        } else {
-            const error = await response.text();
-            alert('Registration failed: ' + error);
+            // Redirect to home page after a short delay
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
         }
     } catch (error) {
         alert('Error during registration: ' + error);
