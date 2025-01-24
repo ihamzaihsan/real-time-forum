@@ -18,29 +18,47 @@ import { handleRegisterSubmit } from './register.js';
 // Register page content function
 function registerContent() {
     document.getElementById('content').innerHTML = `
-        <h1>Register</h1>
-        <form id="registerForm">
-            <input type="text" id="username" placeholder="Username" required><br> 
-            <input type="email" id="email" placeholder="Email" required><br>
-            <input type="password" id="password" placeholder="Password" required><br>
-            <input type="text" id="first_name" placeholder="First Name" required><br>
-            <input type="text" id="last_name" placeholder="Last Name" required><br>
-            <input type="number" id="age" placeholder="Age" required><br>
-            <div class="gender-selection">
-                <label>Gender:</label>
-                <input type="radio" id="male" name="gender" value="male" required>
-                <label for="male">Male</label>
-                <input type="radio" id="female" name="gender" value="female" required>
-                <label for="female">Female</label>
-            </div>
-            <button type="submit">Register</button>
-        </form>
+        <div class="register-container">
+            <h1>Create Account</h1>
+            <form id="registerForm" class="register-form">
+                <div class="form-group">
+                    <input type="text" id="username" placeholder="Username" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" id="email" placeholder="Email" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="password" placeholder="Password" required>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="first_name" placeholder="First Name" required>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="last_name" placeholder="Last Name" required>
+                </div>
+                <div class="form-group">
+                    <input type="number" id="age" placeholder="Age" required>
+                </div>
+                <div class="form-group gender-group">
+                    <label>Gender:</label>
+                    <div class="gender-options">
+                        <label class="gender-label">
+                            <input type="radio" id="male" name="gender" value="male" required>
+                            Male
+                        </label>
+                        <label class="gender-label">
+                            <input type="radio" id="female" name="gender" value="female" required>
+                            Female
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="register-btn">Create Account</button>
+            </form>
+        </div>
     `;
 
     document.getElementById('registerForm').addEventListener('submit', handleRegisterSubmit);
-}
-
-// Handle navigation when a link is clicked
+}// Handle navigation when a link is clicked
 function handleRoute(event) {
     event.preventDefault();
     const path = event.target.getAttribute('href'); // Get the target URL path
@@ -100,7 +118,6 @@ function updateNavigation() {
     const logoutLink = document.querySelector('a[href="/logout"]');
     
     if (sessionToken) {
-        console.log(sessionToken);
         if (registerLink) registerLink.style.display = 'none';
         if (logoutLink) logoutLink.style.display = 'block';
     } else {

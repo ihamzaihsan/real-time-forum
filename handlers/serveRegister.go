@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,10 @@ import (
 )
 
 func ServeRegister(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
+		return
+	}
 	var user models.User
 
 	// Decode the incoming JSON data

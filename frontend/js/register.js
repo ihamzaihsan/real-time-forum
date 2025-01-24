@@ -51,26 +51,20 @@ export async function handleRegisterSubmit(event) {
             body: JSON.stringify(userData)
         });
 
-        if (response.ok) {
-            const result = await response.json();
-            localStorage.setItem('sessionToken', result.token);
-            
-            // Hide the register form
-            document.getElementById('registerForm').style.display = 'none';
-            
-            // Show success message
-            const content = document.getElementById('content');
-            content.innerHTML += `
-                <div class="success-message">
-                    Registration successful! Redirecting to home page...
-                </div>
-            `;
-
-            // Redirect to home page after a short delay
-            setTimeout(() => {
-                window.location.href = '/';
-            }, 2000);
+        if (!response.ok) {
+            const errorText = await response.text();
+            displayErrors([errorText]);
+            return;
         }
+        const result = await response.json();
+        localStorage.setItem('sessionToken', result.token);
+        
+        // Hide the register form
+        document.getElementById('registerForm').style.display = 'none';
+        
+    
+            window.location.href = '/';
+        
     } catch (error) {
         alert('Error during registration: ' + error);
     }

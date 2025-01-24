@@ -5,27 +5,171 @@ body {
     padding: 0;
 }
 
+/* Modern navigation styling */
+nav {
+    background-color: #2c3e50;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 0.5rem 2rem;
+    position: sticky;
+    top: 0;
+}
+
 nav ul {
     list-style: none;
     padding: 0;
-    background-color: #333;
+
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 1rem;
 }
 
 nav ul li {
-    display: inline;
-    padding: 10px;
+
+
+    display: inline-block;
+    padding: 0;
 }
 
 nav ul li a {
-    color: white;
+
+    color: #ecf0f1;
     text-decoration: none;
-    padding: 10px;
+
+    padding: 1rem 1.5rem;
+    display: inline-block;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border-radius: 4px;
 }
 
 nav ul li a:hover {
-    background-color: #575757;
+
+    background-color: #34495e;
+    transform: translateY(-2px);
+}
+
+nav ul li a.active {
+    background-color: #3498db;
+    color: white;
 }
 
 #content {
     padding: 20px;
+}
+/* registeration page */
+/* Registration form styling */
+.register-container {
+    max-width: 500px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.register-container h1 {
+    text-align: center;
+    color: #2c3e50;
+    margin-bottom: 2rem;
+}
+
+.register-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.form-group {
+    position: relative;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="number"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+}
+
+.gender-group {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+.gender-options {
+    display: flex;
+    gap: 2rem;
+    margin-top: 0.5rem;
+}
+
+.gender-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.register-btn {
+    background-color: #3498db;
+    color: white;
+    padding: 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.register-btn:hover {
+    background-color: #2980b9;
+}
+
+/* Error container styling */
+#error-container {
+    background-color: #ffebee;
+    border-left: 4px solid #ef5350;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+}
+
+#error-container p {
+    color: #c62828;
+    margin: 0;
+    font-size: 14px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    nav {
+        padding: 0.5rem 1rem;
+    }
+    
+    nav ul {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    nav ul li {
+        width: 100%;
+    }
+    
+    nav ul li a {
+        width: 100%;
+        text-align: center;
+    }
 }
