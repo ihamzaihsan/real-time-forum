@@ -2,7 +2,8 @@
 const routes = {
     '/': homeContent,
     '/register': registerContent,
-    '/logout': logoutContent
+    '/logout': logoutContent,
+    '/login': loginContent
 };
 
 // Home page content function
@@ -14,6 +15,8 @@ function homeContent() {
 }
 
 import { handleRegisterSubmit } from './register.js';
+import { handleLoginSubmit } from './login.js';
+
 
 // Register page content function
 function registerContent() {
@@ -58,7 +61,37 @@ function registerContent() {
     `;
 
     document.getElementById('registerForm').addEventListener('submit', handleRegisterSubmit);
-}// Handle navigation when a link is clicked
+}
+
+function loginContent() {
+    // Check if user is already logged in
+    const sessionToken = localStorage.getItem('sessionToken');
+    if (sessionToken) {
+        // Redirect to home page if already authenticated
+        window.history.pushState({}, '', '/');
+        renderContent('/');
+        return;
+    }
+
+    // Show login form only if not authenticated
+    document.getElementById('content').innerHTML = `
+        <div class="login-container">
+            <h1>Login</h1>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <input type="text" id="username" placeholder="Username or Email" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="password" placeholder="Password" required>
+                </div>
+                <button type="submit" class="login-btn">Login</button>
+            </form>
+        </div>
+    `;
+
+    document.getElementById('loginForm').addEventListener('submit', handleLoginSubmit);
+}
+// Handle navigation when a link is clicked
 function handleRoute(event) {
     event.preventDefault();
     const path = event.target.getAttribute('href'); // Get the target URL path
@@ -116,13 +149,16 @@ function updateNavigation() {
     const sessionToken = localStorage.getItem('sessionToken');
     const registerLink = document.querySelector('a[href="/register"]');
     const logoutLink = document.querySelector('a[href="/logout"]');
+    const loginLink = document.querySelector('a[href="/login"]');
     
     if (sessionToken) {
         if (registerLink) registerLink.style.display = 'none';
         if (logoutLink) logoutLink.style.display = 'block';
+        if (loginLink) loginLink.style.display = 'none';
     } else {
         if (registerLink) registerLink.style.display = 'block';
         if (logoutLink) logoutLink.style.display = 'none';
+        if (loginLink) loginLink.style.display = 'block';
     }
 }
 

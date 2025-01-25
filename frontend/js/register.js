@@ -1,4 +1,6 @@
 import { displayErrors } from './router.js';
+import { handleLoginSubmit } from './login.js';
+
 
 export async function handleRegisterSubmit(event) {
     event.preventDefault();
