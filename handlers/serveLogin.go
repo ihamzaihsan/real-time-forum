@@ -95,7 +95,9 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Send success response
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Login successful",
+		"token":   sessionToken,
+		"user_id": user.ID, 
 	})
 }

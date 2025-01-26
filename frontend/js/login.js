@@ -23,30 +23,41 @@ export async function handleLoginSubmit(event) {
     }
 
     try {
-        const response = await fetch('/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(loginData)
+    const response = await fetch('/login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(loginData)
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.log('Login response not OK:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
         });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            displayErrors([errorText]);
-            return;
-        }
-
-        const result = await response.json();
-        localStorage.setItem('sessionToken', result.token);
-        
-        // Hide login form
-        document.getElementById('loginForm').style.display = 'none';
-        
-        // Redirect to home page
-        window.location.href = '/';
-        
-    } catch (error) {
-        displayErrors(['Error during login. Please try again.']);
+        displayErrors([errorText]);
+        return;
     }
+
+    const result = await response.json();
+    console.log('Login success response:', result);
+
+    localStorage.clear();
+    localStorage.setItem('sessionToken', result.token);
+    localStorage.setItem('username', loginData.username);
+    localStorage.setItem('userId', result.user_id.toString());
+    if (window.wsClient) {
+        window.wsClient.connect();
+    }
+
+    window.location.href = '/';
+    
+} catch (error) {
+    console.log('Login error details:', error);
+    displayErrors(['Error during login. Please try again.']);
+}
+
 }

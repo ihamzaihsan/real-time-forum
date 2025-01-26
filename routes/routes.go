@@ -11,4 +11,6 @@ func InitRoutes() {
 	http.HandleFunc("/ws", handlers.HandleWebSocket)
 	http.HandleFunc("/logout", handlers.ServeLogout)
 	http.HandleFunc("/login", handlers.ServeLogin)
+	http.HandleFunc("/messages/", handlers.ServeMessages) // Add trailing slash
+
 }

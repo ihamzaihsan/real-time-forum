@@ -2,29 +2,31 @@
 
 // Import the router logic from router.js
 import { initRouter } from './router.js';
+import { WebSocketClient } from './websocket.js';
+import { initMessageHandlers } from './message.js';
 
 // Initialize the router when the DOM content is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize the routing logic
+    const wsClient = new WebSocketClient();
     initRouter();
+    initMessageHandlers(wsClient);
+    wsClient.connect(); 
     
-    // Connect to WebSocket
-    const socket = new WebSocket('ws://localhost:8080/ws');
 
-    socket.onopen = () => {
-        console.log('WebSocket connection established');
-    };
+    wsClient.addMessageHandler('chat', (content) => {
+        console.log('Received chat message:', content);
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <span class="sender">${content.sender}:</span>
+                <span class="text">${content.message}</span>
+            `;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    });
 
-    socket.onmessage = (event) => {
-        console.log('Message from server:', event.data);
-        // Handle incoming messages (e.g., update UI)
-    };
-
-    socket.onclose = () => {
-        console.log('WebSocket connection closed');
-    };
-
-    socket.onerror = (error) => {
-        console.error('WebSocket error:', error);
-    };
+    window.wsClient = wsClient;
 });

@@ -3,21 +3,75 @@ const routes = {
     '/': homeContent,
     '/register': registerContent,
     '/logout': logoutContent,
-    '/login': loginContent
+    '/login': loginContent,
+    '/chat': chatContent
 };
-
-// Home page content function
 function homeContent() {
     document.getElementById('content').innerHTML = `
-        <h1>Welcome to the Home Page</h1>
-        <p>This is the home page content.</p>
+        <div class="home-container">
+            <h1>Welcome to Real Time Forum</h1>
+            <p>This is a place where you can connect with others in real-time!</p>
+        </div>
     `;
 }
+
 
 import { handleRegisterSubmit } from './register.js';
 import { handleLoginSubmit } from './login.js';
 
+function chatContent() {
+    const container = document.getElementById('content');
+    container.innerHTML = `
+        <div class="chat-container">
+            <div class="online-users-sidebar">
+                <h3>Users</h3>
+                <div class="users-list" id="onlineUsers"></div>
+            </div>
+            <div class="chat-main">
+                <div id="selectedUserName" class="selected-user"></div>
+                <div class="chat-messages" id="messageHistory"></div>
+                <form id="messageForm" class="chat-input">
+                    <input type="text" id="messageInput" placeholder="Type a message...">
+                    <button type="submit">Send</button>
+                </form>
+            </div>
+        </div>
+    `;
 
+    // Initialize message form handler
+    const messageForm = document.getElementById('messageForm');
+    if (messageForm) {
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const messageInput = document.getElementById('messageInput');
+            const content = messageInput.value.trim();
+            
+            if (content && window.wsClient && window.wsClient.currentChatUser) {
+                window.wsClient.sendPrivateMessage(window.wsClient.currentChatUser, content);
+                messageInput.value = '';
+                
+                // Add message to UI immediately
+                const messageHistory = document.getElementById('messageHistory');
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message sent';
+                messageElement.innerHTML = `
+                    <div class="message-content">
+                        <span class="message-text">${content}</span>
+                        <span class="message-time">${new Date().toLocaleTimeString()}</span>
+                    </div>
+                `;
+                messageHistory.appendChild(messageElement);
+                messageHistory.scrollTop = messageHistory.scrollHeight;
+            }
+        });
+    }
+
+    // Reconnect WebSocket when entering chat
+    if (window.wsClient) {
+        window.wsClient.connect();
+        window.wsClient.sendMessage('get_users', {});
+    }
+}
 // Register page content function
 function registerContent() {
     document.getElementById('content').innerHTML = `
@@ -94,9 +148,15 @@ function loginContent() {
 // Handle navigation when a link is clicked
 function handleRoute(event) {
     event.preventDefault();
-    const path = event.target.getAttribute('href'); // Get the target URL path
-    window.history.pushState({}, '', path); // Update the browser URL
-    renderContent(path); // Render content based on the current path
+    const path = event.target.getAttribute('href');
+    window.history.pushState({}, '', path);
+    renderContent(path);
+    
+    // Initialize WebSocket connection when navigating to chat
+    if (path === '/chat' && window.wsClient) {
+        window.wsClient.connect();
+        window.wsClient.sendMessage('get_users', {});
+    }
 }
 
 // Logout content function
@@ -150,15 +210,18 @@ function updateNavigation() {
     const registerLink = document.querySelector('a[href="/register"]');
     const logoutLink = document.querySelector('a[href="/logout"]');
     const loginLink = document.querySelector('a[href="/login"]');
+    const chatLink = document.querySelector('a[href="/chat"]');
     
     if (sessionToken) {
         if (registerLink) registerLink.style.display = 'none';
         if (logoutLink) logoutLink.style.display = 'block';
         if (loginLink) loginLink.style.display = 'none';
+        if (chatLink) chatLink.style.display = 'block';
     } else {
         if (registerLink) registerLink.style.display = 'block';
         if (logoutLink) logoutLink.style.display = 'none';
         if (loginLink) loginLink.style.display = 'block';
+        if (chatLink) chatLink.style.display = 'none';
     }
 }
 
@@ -188,23 +251,35 @@ function initRouter() {
     updateNavigation();
     window.addEventListener('popstate', updateNavigation);
 }
-
+function throttle(func, limit) {
+    let inThrottle;
+    return function(...args) {
+        if (!inThrottle) {
+            func.apply(this, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    }
+}
 // Display errors for form validation
 function displayErrors(errors) {
-    // Create or get error container
-    let errorContainer = document.getElementById('error-container');
-    if (!errorContainer) {
-        errorContainer = document.createElement('div');
-        errorContainer.id = 'error-container';
-        errorContainer.style.color = 'red';
-        errorContainer.style.marginBottom = '10px';
-        const form = document.getElementById('registerForm');
-        form.insertBefore(errorContainer, form.firstChild);
-    }
+    const form = document.querySelector('form');
+    if (!form) return; // Exit if no form is found
     
-    // Display errors
-    errorContainer.innerHTML = errors.map(error => `<p>${error}</p>`).join('');
+    // Remove any existing error messages
+    const existingErrors = document.querySelector('.error-messages');
+    if (existingErrors) {
+        existingErrors.remove();
+    }
+
+    // Create and insert new error messages
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-messages';
+    errorDiv.innerHTML = errors.map(error => `<p>${error}</p>`).join('');
+    form.insertBefore(errorDiv, form.firstChild);
 }
 
 // Export initRouter and displayErrors for use in other modules
 export { initRouter, displayErrors };
+
+
