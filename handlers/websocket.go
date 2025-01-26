@@ -65,6 +65,12 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[INFO] Client connected: %d (%s)", userID, username)
 
+	// Update user status to online
+	_, err = database.DBInstance.DB.Exec(
+		"UPDATE users SET is_online = TRUE WHERE id = ?",
+		userID,
+	)
+
 	// Start goroutine for broadcasting user list updates
 	go broadcastActiveUsers()
 
@@ -72,8 +78,21 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		clientsMutex.Lock()
 		delete(clients, userID)
 		clientsMutex.Unlock()
+		
+		// Update user status to offline in database
+		_, err := database.DBInstance.DB.Exec(
+			"UPDATE users SET is_online = FALSE WHERE id = ?",
+			userID,
+		)
+		if err != nil {
+			log.Printf("[ERROR] Failed to update offline status: %v", err)
+		}
+		
+		// Broadcast updated user list to all clients
+		go broadcastActiveUsers()
+		
 		conn.Close()
-		log.Printf("[INFO] Client disconnected: %d (%s)", userID, username)
+		
 	}()
 
 	for {
@@ -100,10 +119,8 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[WARN] Unknown message type from user %d (%s): %s", userID, username, msg.Type)
 		}
 	}
-}
-
-// Helper Functions
-
+}// this function  toFetches a list of active users from the database, excluding the current user
+// and Periodically sends the user list to each connected client.
 func broadcastActiveUsers() {
     for {
         // Get current userID from the clients map

@@ -19,7 +19,6 @@ func ServeLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Delete the session from the database
 	_, err := database.DBInstance.DB.Exec("UPDATE users SET is_online = FALSE WHERE email IN (SELECT email FROM sessions WHERE session_token = ?)", sessionToken)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
