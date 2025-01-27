@@ -12,5 +12,6 @@ func InitRoutes() {
 	http.HandleFunc("/logout", handlers.ServeLogout)
 	http.HandleFunc("/login", handlers.ServeLogin)
 	http.HandleFunc("/messages/", handlers.ServeMessages) // Add trailing slash
-
+	http.HandleFunc("/create_post", handlers.ServeCreatePost)
+	http.HandleFunc("/posts", handlers.ServePosts)
 }
