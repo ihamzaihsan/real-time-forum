@@ -69,7 +69,7 @@ function chatContent() {
     // Reconnect WebSocket when entering chat
     if (window.wsClient) {
         window.wsClient.connect();
-        window.wsClient.sendMessage('get_users', {});
+        
     }
 }
 // Register page content function
@@ -155,7 +155,7 @@ function handleRoute(event) {
     // Initialize WebSocket connection when navigating to chat
     if (path === '/chat' && window.wsClient) {
         window.wsClient.connect();
-        window.wsClient.sendMessage('get_users', {});
+
     }
 }
 

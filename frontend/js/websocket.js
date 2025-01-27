@@ -17,9 +17,7 @@ export class WebSocketClient {
             console.log('Pong received:', content);
         });
 
-        this.addMessageHandler('get_users', () => {
-            this.sendMessage('get_users', {});
-        });
+        
     }
     connect() {
         console.log('Attempting WebSocket connection...');
@@ -79,8 +77,17 @@ export class WebSocketClient {
 
     
     
-    
     sendPrivateMessage(receiverId, content) {
+        // Check if the receiver is online before sending
+        const usersList = document.getElementById('onlineUsers');
+        const userElement = usersList.querySelector(`[data-userid="${receiverId}"]`);
+        const isOffline = userElement?.classList.contains('offline');
+    
+        if (isOffline) {
+            alert('Cannot send message. User is offline');
+            return;
+        }
+    
         const timestamp = new Date().toISOString();
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.sendMessage('private_message', {
@@ -88,59 +95,50 @@ export class WebSocketClient {
                 message: content,
                 timestamp: timestamp,
             });
-        } else {
-            console.error('Cannot send private message, WebSocket is not open.');
         }
     }
+    
 
     updateUsersList(users) {
         const usersList = document.getElementById('onlineUsers');
         if (!usersList) return;
     
         usersList.innerHTML = '';
-        users
-            .sort((a, b) => {
-                if (a.lastMessageTime !== b.lastMessageTime) {
-                    return new Date(b.lastMessageTime) - new Date(a.lastMessageTime);
-                }
-                return a.username.localeCompare(b.username);
-            })
-            .forEach((user) => {
-                const userElement = document.createElement('div');
-                userElement.className = `user-item ${user.isOnline ? 'online' : 'offline'}`;
-                userElement.innerHTML = `
-                    <span class="user-status"></span>
-                    <span class="user-name">${user.username}</span>
-                `;
+        users.forEach((user) => {
+            const userElement = document.createElement('div');
+            userElement.className = `user-item ${user.isOnline ? 'online' : 'offline'}`;
+            userElement.setAttribute('data-userid', user.id);
+            userElement.innerHTML = `
+                <span class="user-status"></span>
+                <span class="user-name">${user.username}</span>
+            `;
+            
+            if (user.isOnline) {
                 userElement.addEventListener('click', () => {
-                    // Clear existing messages first
                     const messageHistory = document.getElementById('messageHistory');
                     if (messageHistory) {
                         messageHistory.innerHTML = '';
                     }
                     
-                    // Update UI to show active selection
                     document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
                     userElement.classList.add('active');
                     
-                    // Update selected user name
                     const selectedUserName = document.getElementById('selectedUserName');
                     if (selectedUserName) {
                         selectedUserName.textContent = user.username;
                     }
-    
-                    // Set current chat user and load messages
+        
                     this.currentChatUser = user.id;
                     loadMessages(this, user.id);  
                     
-                    // Show message form
                     const messageForm = document.getElementById('messageForm');
                     if (messageForm) {
                         messageForm.style.display = 'flex';
                     }
                 });
-                usersList.appendChild(userElement);
-            });
+            }
+            usersList.appendChild(userElement);
+        });
     }
     
 }

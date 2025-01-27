@@ -9,12 +9,11 @@ export function initMessageHandlers(wsClient) {
         console.log('Received pong response:', content);
     });
     wsClient.addMessageHandler('private_message', (content) => {
-        if (wsClient.currentChatUser) {
-            const messageContainer = document.getElementById('messageHistory');
+        const messageContainer = document.getElementById('messageHistory');
+        if (wsClient.currentChatUser && messageContainer) {
             const currentUserId = parseInt(localStorage.getItem('userId'));
             const messageElement = document.createElement('div');
-            const isCurrentUser = Number(message.sender_id) === currentUserId;
-
+            const isCurrentUser = Number(content.sender_id) === currentUserId;
             
             messageElement.className = `message ${isCurrentUser ? 'sent' : 'received'}`;
             messageElement.innerHTML = `
@@ -27,6 +26,7 @@ export function initMessageHandlers(wsClient) {
             messageContainer.scrollTop = messageContainer.scrollHeight;
         }
     });
+    
 
     const messageForm = document.getElementById('messageForm');
     if (messageForm) {
