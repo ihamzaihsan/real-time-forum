@@ -22,7 +22,14 @@ type Message struct {
 	Content interface{} `json:"content"`
 }
 
-var clients = make(map[int]*websocket.Conn)
+// Add a connection write mutex for each client
+type SafeConn struct {
+    conn *websocket.Conn
+    mu   sync.Mutex
+}
+
+// Update the clients map to use SafeConn
+var clients = make(map[int]*SafeConn)
 var clientsMutex sync.RWMutex
 
 // HandleWebSocket handles the WebSocket connections
@@ -42,6 +49,10 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+    safeConn := &SafeConn{
+        conn: conn,
+    }
+
 	// Set the Authorization header with the token
 	r.Header.Set("Authorization", sessionToken)
 
@@ -60,7 +71,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clientsMutex.Lock()
-	clients[userID] = conn
+	clients[userID] = safeConn
 	clientsMutex.Unlock()
 
 	log.Printf("[INFO] Client connected: %d (%s)", userID, username)
@@ -106,7 +117,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		case "private_message":
 			handlePrivateMessage(userID, username, msg.Content)
 		case "ping":
-			err = conn.WriteJSON(Message{
+			err = safeConn.WriteJSON(Message{
 				Type: "pong",
 				Content: map[string]interface{}{
 					"timestamp": time.Now().Format(time.RFC3339),
@@ -119,8 +130,16 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[WARN] Unknown message type from user %d (%s): %s", userID, username, msg.Type)
 		}
 	}
-}// this function  toFetches a list of active users from the database, excluding the current user
-// and Periodically sends the user list to each connected client.
+}
+
+// Create a safe write method
+func (sc *SafeConn) WriteJSON(v interface{}) error {
+    sc.mu.Lock()
+    defer sc.mu.Unlock()
+    return sc.conn.WriteJSON(v)
+}
+
+// Periodically sends the user list to each connected client.
 func broadcastActiveUsers() {
     for {
         // Get current userID from the clients map
@@ -148,7 +167,6 @@ func broadcastActiveUsers() {
         time.Sleep(30 * time.Second)
     }
 }
-
 func handlePrivateMessage(senderID int, senderUsername string, content interface{}) {
 	contentMap, ok := content.(map[string]interface{})
 	if !ok {
