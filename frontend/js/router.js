@@ -1,11 +1,62 @@
+import { handleRegisterSubmit } from './register.js';
+import { handleLoginSubmit } from './login.js';
+
 // Route definitions: Map URL paths to corresponding content functions
 const routes = {
-    '/': homeContent,
-    '/register': registerContent,
-    '/logout': logoutContent,
-    '/login': loginContent,
-    '/chat': chatContent
+    '/': { component: homeContent, requiresAuth: true },
+    '/register': { component: registerContent, requiresAuth: false },
+    '/logout': { component: logoutContent, requiresAuth: true },
+    '/login': { component: loginContent, requiresAuth: false },
+    '/chat': { component: chatContent, requiresAuth: true }
 };
+
+function renderContent(path) {
+    const isAuthenticated = checkAuth();
+    
+    // Check if path exists in routes
+    if (!routes[path]) {
+        // Invalid path - redirect based on auth status
+        if (isAuthenticated) {
+            window.history.pushState({}, '', '/');
+            routes['/'].component();
+        } else {
+            window.history.pushState({}, '', '/login');
+            routes['/login'].component();
+        }
+        return;
+    }
+
+    const route = routes[path];
+
+    if (path === '/logout') {
+        window.history.pushState({}, '', '/login');
+        loginContent();
+        return;
+    }
+
+    if (!isAuthenticated && route.requiresAuth) {
+        // Redirect to login if trying to access protected route
+        window.history.pushState({}, '', '/login');
+        routes['/login'].component();
+        return;
+    }
+
+    if (isAuthenticated && path === '/') {
+        // If logged in and accessing root, show home
+        route.component();
+    } else if (!isAuthenticated && path !== '/login' && path !== '/register') {
+        // If not logged in and not trying to access login/register, redirect to login
+        window.history.pushState({}, '', '/login');
+        routes['/login'].component();
+    } else {
+        // Normal route handling
+        route.component();
+    }
+}
+function checkAuth() {
+    const sessionToken = localStorage.getItem('sessionToken');
+    return !!sessionToken;
+}
 function homeContent() {
     document.getElementById('content').innerHTML = `
         <div class="home-container">
@@ -15,26 +66,15 @@ function homeContent() {
     `;
 }
 
-
-import { handleRegisterSubmit } from './register.js';
-import { handleLoginSubmit } from './login.js';
-
 function chatContent() {
-    const container = document.getElementById('content');
-    container.innerHTML = `
-        <div class="chat-container">
-            <div class="online-users-sidebar">
-                <h3>Users</h3>
-                <div class="users-list" id="onlineUsers"></div>
-            </div>
-            <div class="chat-main">
-                <div id="selectedUserName" class="selected-user"></div>
-                <div class="chat-messages" id="messageHistory"></div>
-                <form id="messageForm" class="chat-input">
-                    <input type="text" id="messageInput" placeholder="Type a message...">
-                    <button type="submit">Send</button>
-                </form>
-            </div>
+    document.getElementById('content').innerHTML = `
+        <div class="chat-main">
+            <div id="selectedUserName" class="selected-user"></div>
+            <div class="chat-messages" id="messageHistory"></div>
+            <form id="messageForm" class="chat-input">
+                <input type="text" id="messageInput" placeholder="Type a message...">
+                <button type="submit">Send</button>
+            </form>
         </div>
     `;
 
@@ -69,11 +109,10 @@ function chatContent() {
     // Reconnect WebSocket when entering chat
     if (window.wsClient) {
         window.wsClient.connect();
-        
     }
-}
-// Register page content function
+}// Register page content function
 function registerContent() {
+    document.body.className = 'login-page';
     document.getElementById('content').innerHTML = `
         <div class="register-container">
             <h1>Create Account</h1>
@@ -118,6 +157,7 @@ function registerContent() {
 }
 
 function loginContent() {
+    document.body.className = 'login-page';
     // Check if user is already logged in
     const sessionToken = localStorage.getItem('sessionToken');
     if (sessionToken) {
@@ -162,15 +202,15 @@ function handleRoute(event) {
 // Logout content function
 async function logoutContent(event) {
     if (event) {
-        event.preventDefault(); // Prevent default link navigation
+        event.preventDefault();
     }
 
     const sessionToken = localStorage.getItem('sessionToken');
 
-    // Check if session token exists before making the logout request
+    // If no session token, redirect to login immediately
     if (!sessionToken) {
-        console.error('No session token found.');
-        alert('You are not logged in.');
+        window.history.pushState({}, '', '/login');
+        loginContent();
         return;
     }
 
@@ -183,26 +223,25 @@ async function logoutContent(event) {
         });
 
         if (response.ok) {
-            // Clear session token and update UI
             localStorage.removeItem('sessionToken');
-            updateNavigation(); // Update navigation to reflect logged-out state
-            window.history.pushState({}, '', '/'); // Redirect to the home page
-            renderContent('/'); // Render home page content
+            updateNavigation();
+            window.history.pushState({}, '', '/login');
+            loginContent();
         } else {
             console.error('Logout failed with status:', response.status);
-            alert('Failed to log out. Please try again.');
+            // Still redirect to login on failure
+            window.history.pushState({}, '', '/login');
+            loginContent();
         }
     } catch (error) {
         console.error('Logout failed:', error);
-        alert('An error occurred during logout. Please try again later.');
+        // Also redirect to login on error
+        window.history.pushState({}, '', '/login');
+        loginContent();
     }
 }
 
-// Render content based on the current route
-function renderContent(path) {
-    const render = routes[path] || routes['/']; // Default to home if no matching route
-    render(); // Call the function for the current route
-}
+
 
 // Update navigation links visibility based on login state
 function updateNavigation() {
@@ -210,18 +249,15 @@ function updateNavigation() {
     const registerLink = document.querySelector('a[href="/register"]');
     const logoutLink = document.querySelector('a[href="/logout"]');
     const loginLink = document.querySelector('a[href="/login"]');
-    const chatLink = document.querySelector('a[href="/chat"]');
     
     if (sessionToken) {
         if (registerLink) registerLink.style.display = 'none';
         if (logoutLink) logoutLink.style.display = 'block';
         if (loginLink) loginLink.style.display = 'none';
-        if (chatLink) chatLink.style.display = 'block';
     } else {
         if (registerLink) registerLink.style.display = 'block';
         if (logoutLink) logoutLink.style.display = 'none';
         if (loginLink) loginLink.style.display = 'block';
-        if (chatLink) chatLink.style.display = 'none';
     }
 }
 
@@ -280,6 +316,7 @@ function displayErrors(errors) {
 }
 
 // Export initRouter and displayErrors for use in other modules
-export { initRouter, displayErrors };
+export { initRouter, displayErrors, renderContent };
+
 
 

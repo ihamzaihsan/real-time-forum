@@ -36,7 +36,6 @@ var clientsMutex sync.RWMutex
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Get token from query parameter
 	sessionToken := r.URL.Query().Get("token")
-    log.Println("the sission: ", sessionToken)
 	if sessionToken == "" {
 		log.Println("[ERROR] Missing session token")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -74,7 +73,6 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	clients[userID] = safeConn
 	clientsMutex.Unlock()
 
-	log.Printf("[INFO] Client connected: %d (%s)", userID, username)
 
 	// Update user status to online
 	_, err = database.DBInstance.DB.Exec(

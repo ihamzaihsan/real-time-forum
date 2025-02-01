@@ -1,5 +1,7 @@
 import { initMessageHandlers } from './message.js';
 import { loadMessages } from './chat.js';
+import { renderContent } from './router.js';
+
 export class WebSocketClient {
     constructor() {
         this.socket = null;
@@ -135,6 +137,10 @@ export class WebSocketClient {
                     if (messageForm) {
                         messageForm.style.display = 'flex';
                     }
+
+                    // Navigate to chat page
+                    window.history.pushState({}, '', '/chat');
+                    renderContent('/chat');
                 });
             }
             usersList.appendChild(userElement);
