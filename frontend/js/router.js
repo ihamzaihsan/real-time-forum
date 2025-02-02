@@ -1,6 +1,7 @@
 import { handleRegisterSubmit } from './register.js';
 import { handleLoginSubmit } from './login.js';
 import { handleCreatePost } from './createPost.js';
+import { initializeScrollListener } from './chat.js';
 
 // Route definitions: Map URL paths to corresponding content functions
 const routes = {
@@ -192,6 +193,9 @@ function chatContent() {
             </form>
         </div>
     `;
+
+    initializeScrollListener();
+    
 
     // Initialize message form handler
     const messageForm = document.getElementById('messageForm');
