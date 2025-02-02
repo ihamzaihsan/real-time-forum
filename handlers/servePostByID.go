@@ -4,13 +4,15 @@ import (
 	"RTF/database"
 	"RTF/models"
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 )
 
-func ServePosts(w http.ResponseWriter, r *http.Request) {
-	query := `
+func ServePostByID(w http.ResponseWriter, r *http.Request) {
+
+    postID := strings.TrimPrefix(r.URL.Path, "/post/")
+
+	rows, err := database.DBInstance.DB.Query(`
         SELECT p.id, p.title, p.content, u.username, p.created_at,
         (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND is_like = 1) AS likes,
         (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND is_like = 0) AS dislikes,
@@ -19,33 +21,30 @@ func ServePosts(w http.ResponseWriter, r *http.Request) {
         JOIN users u ON p.user_id = u.id
         LEFT JOIN post_categories pc ON p.id = pc.post_id
         LEFT JOIN categories c ON pc.category_id = c.id
+        WHERE p.id = ?
         GROUP BY p.id
-        ORDER BY p.created_at DESC
-        LIMIT 10
-    `
-
-	rows, err := database.DBInstance.DB.Query(query)
+    `, postID)
 	if err != nil {
-		log.Printf("Database query error: %v", err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
-	var posts []models.Post
-	for rows.Next() {
-		var post models.Post
-		var categoriesStr string
-		if err := rows.Scan(&post.ID, &post.Title, &post.Content, &post.Username, &post.CreatedAt, &post.Likes, &post.Dislikes, &categoriesStr); err != nil {
-			http.Error(w, "Database error", http.StatusInternalServerError)
-            log.Printf("Database scan error: %v", err)
-			return
-		}
-		if categoriesStr != "" {
-			post.Categories = strings.Split(categoriesStr, ",")
-		}
-		posts = append(posts, post)
+
+	var post models.Post
+	var categoriesStr string
+
+	if !rows.Next() {
+		http.Error(w, "Post not found", http.StatusNotFound)
+		return
+	}
+	if err := rows.Scan(&post.ID, &post.Title, &post.Content, &post.Username, &post.CreatedAt, &post.Likes, &post.Dislikes, &categoriesStr); err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if categoriesStr != "" {
+		post.Categories = strings.Split(categoriesStr, ",")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(posts)
+	json.NewEncoder(w).Encode(post)
 }

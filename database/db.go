@@ -37,14 +37,14 @@ func InitDB() error {
 		return fmt.Errorf("error creating tables: %v", err)
 	}
 	
-	// AddDefaultCategories(DBInstance.DB)
+	AddDefaultCategories(DBInstance.DB)
 
 	return nil
 }
 
 func CreateTables(db *sql.DB) error {
 	
-	// Modify the existing users table creation
+	
 createUsersTable := `
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,14 +93,14 @@ CREATE TABLE IF NOT EXISTS users (
     return fmt.Errorf("failed to create posts table: %v", err)
 	}
 
-	createPostCategoriesTable := `
-      CREATE TABLE IF NOT EXISTS post_categories (
-          post_id INTEGER,
-          category_id INTEGER,
-          PRIMARY KEY (post_id, category_id),
-          FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE,
-          FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
-      );`
+        createPostCategoriesTable := `
+        CREATE TABLE IF NOT EXISTS post_categories (
+            post_id INTEGER,
+            category_id INTEGER,
+            PRIMARY KEY (post_id, category_id),
+            FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE,
+            FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
+        );`
 
 	
 	if _, err := db.Exec(createPostCategoriesTable); err != nil {
@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS users (
 		return fmt.Errorf("failed to create likes table: %v", err)
 	}
 
-	// Add this to the CreateTables function
+	
 createMessagesTable := `
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,4 +176,24 @@ if _, err := db.Exec(createMessagesTable); err != nil {
 	}
 
 	return nil 
+}
+
+func AddDefaultCategories(db *sql.DB) error {
+
+	categories := []string{"science", "technology", "art", "sport", "games"}
+
+	stmt, err := db.Prepare("INSERT INTO categories (name) VALUES (?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, category := range categories {
+		_, err := stmt.Exec(category)
+		if err != nil {
+
+			return err
+		}
+	}
+	return nil
 }

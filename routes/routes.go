@@ -21,4 +21,6 @@ func InitRoutes() {
 	http.HandleFunc("/messages/", handlers.ServeMessages)
 	http.HandleFunc("/create_post", handlers.ServeCreatePost)
 	http.HandleFunc("/posts", handlers.ServePosts)
+	http.HandleFunc("/post/", handlers.ServePostByID)
+
 }

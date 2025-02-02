@@ -1,5 +1,6 @@
 import { handleRegisterSubmit } from './register.js';
 import { handleLoginSubmit } from './login.js';
+import { handleCreatePost } from './createPost.js';
 
 // Route definitions: Map URL paths to corresponding content functions
 const routes = {
@@ -7,12 +8,26 @@ const routes = {
     '/register': { component: registerContent, requiresAuth: false },
     '/logout': { component: logoutContent, requiresAuth: true },
     '/login': { component: loginContent, requiresAuth: false },
-    '/chat': { component: chatContent, requiresAuth: true }
+    '/chat': { component: chatContent, requiresAuth: true },
+    '/post/:id': { component: singlePostContent, requiresAuth: true  },
+    '/create_post': { component: createPostContent, requiresAuth: true }
 };
 
 function renderContent(path) {
     const isAuthenticated = checkAuth();
     
+    // Handle dynamic routes first
+    const postMatch = path.match(/^\/post\/(\d+)$/);
+    if (postMatch) {
+        if (!isAuthenticated) {
+            window.history.pushState({}, '', '/login');
+            routes['/login'].component();
+            return;
+        }
+        routes['/post/:id'].component();
+        return;
+    }
+
     // Check if path exists in routes
     if (!routes[path]) {
         // Invalid path - redirect based on auth status
@@ -52,19 +67,119 @@ function renderContent(path) {
         // Normal route handling
         route.component();
     }
-}
-function checkAuth() {
+}function checkAuth() {
     const sessionToken = localStorage.getItem('sessionToken');
     return !!sessionToken;
 }
+
 function homeContent() {
     document.getElementById('content').innerHTML = `
         <div class="home-container">
-            <h1>Welcome to Real Time Forum</h1>
-            <p>This is a place where you can connect with others in real-time!</p>
+            <div id="posts-container" class="posts-container"></div>
         </div>
     `;
+
+    fetch('/posts')
+        .then(response => response.json())
+        .then(posts => {
+            const postsContainer = document.getElementById('posts-container');
+            posts.forEach(post => {
+                postsContainer.innerHTML += `
+                    <div class="post-card" data-post-id="${post.id}">
+                        <h2>${post.title}</h2>
+                        <p class="post-meta">Posted by ${post.username} on ${new Date(post.created_at).toLocaleDateString()}</p>
+                        <p class="post-content">${post.content}</p>
+                        <div class="post-categories">
+                            ${post.categories ? post.categories.map(cat => `<span class="category">${cat}</span>`).join('') : ''}
+                        </div>
+                        <div class="post-reactions">
+                            <span>👍 ${post.likes}</span>
+                            <span>👎 ${post.dislikes}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Add click event listeners after adding posts
+            const postCards = document.querySelectorAll('.post-card');
+            postCards.forEach(card => {
+                card.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const postId = card.dataset.postId;
+                    window.history.pushState({}, '', `/post/${postId}`);
+                    renderContent(`/post/${postId}`);
+                });
+            });
+        });
 }
+function createPostContent() {
+    document.getElementById('content').innerHTML = `
+        <div class="create-post-container">
+            <h2>Create New Post</h2>
+            <form id="createPostForm">
+                <input type="text" id="title" placeholder="Post Title" required>
+                <textarea id="postContent" placeholder="Write your post here..." required></textarea>
+                <div class="categories-section">
+                    <select id="categories" multiple>
+                        <option value="Technology">Technology</option>
+                        <option value="Science">Science</option>
+                        <option value="Sports">Sports</option>
+                        <option value="News">News</option>
+                        <option value="Entertainment">Entertainment</option>
+                    </select>
+                </div>
+                <button type="submit">Create Post</button>
+            </form>
+        </div>
+    `;
+
+    document.getElementById('createPostForm').addEventListener('submit', handleCreatePost);
+}
+
+function singlePostContent() {
+    const postId = window.location.pathname.split('/')[2];
+    
+    document.getElementById('content').innerHTML = `
+        <div class="single-post-container">
+            <div id="post-content">Loading post...</div>
+            <div id="comments-section"></div>
+        </div>
+    `;
+
+    fetch(`/post/${postId}`)
+        .then(response => response.json())
+        .then(post => {
+            document.getElementById('post-content').innerHTML = `
+                <h2>${post.title}</h2>
+                <p class="post-meta">Posted by ${post.username} on ${new Date(post.created_at).toLocaleDateString()}</p>
+                <div class="post-content">${post.content}</div>
+                <div class="post-categories">
+                    ${post.categories ? post.categories.map(cat => `<span class="category">${cat}</span>`).join('') : ''}
+                </div>
+                <div class="post-reactions">
+                    <span>👍 ${post.likes}</span>
+                    <span>👎 ${post.dislikes}</span>
+                </div>
+            `;
+
+            // Only show comments section if there are comments
+            if (post.comments && post.comments.length > 0) {
+                const commentsSection = document.getElementById('comments-section');
+                commentsSection.innerHTML = `
+                    <h3>Comments</h3>
+                    <div class="comments-list">
+                        ${post.comments.map(comment => `
+                            <div class="comment">
+                                <p class="comment-meta">By ${comment.username} on ${new Date(comment.created_at).toLocaleDateString()}</p>
+                                <p class="comment-content">${comment.content}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        });
+}
+
 
 function chatContent() {
     document.getElementById('content').innerHTML = `
@@ -110,7 +225,11 @@ function chatContent() {
     if (window.wsClient) {
         window.wsClient.connect();
     }
-}// Register page content function
+}
+
+
+
+// Register page content function
 function registerContent() {
     document.body.className = 'login-page';
     document.getElementById('content').innerHTML = `
@@ -246,18 +365,24 @@ async function logoutContent(event) {
 // Update navigation links visibility based on login state
 function updateNavigation() {
     const sessionToken = localStorage.getItem('sessionToken');
+    const homeLink = document.querySelector('a[href="/"]');
     const registerLink = document.querySelector('a[href="/register"]');
     const logoutLink = document.querySelector('a[href="/logout"]');
     const loginLink = document.querySelector('a[href="/login"]');
+    const createPostLink = document.querySelector('a[href="/create_post"]');
     
     if (sessionToken) {
+        if (homeLink) homeLink.style.display = 'block';
         if (registerLink) registerLink.style.display = 'none';
         if (logoutLink) logoutLink.style.display = 'block';
         if (loginLink) loginLink.style.display = 'none';
+        if (createPostLink) createPostLink.style.display = 'block';
     } else {
+        if (homeLink) homeLink.style.display = 'none';
         if (registerLink) registerLink.style.display = 'block';
         if (logoutLink) logoutLink.style.display = 'none';
         if (loginLink) loginLink.style.display = 'block';
+        if (createPostLink) createPostLink.style.display = 'none';
     }
 }
 
