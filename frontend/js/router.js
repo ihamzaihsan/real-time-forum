@@ -1,6 +1,7 @@
 import { handleRegisterSubmit } from './register.js';
 import { handleLoginSubmit } from './login.js';
 import { handleCreatePost } from './createPost.js';
+import { renderCommentSection, initializeComments } from './comments.js';
 
 // Route definitions: Map URL paths to corresponding content functions
 const routes = {
@@ -162,24 +163,11 @@ function singlePostContent() {
                 </div>
             `;
 
-            // Only show comments section if there are comments
-            if (post.comments && post.comments.length > 0) {
-                const commentsSection = document.getElementById('comments-section');
-                commentsSection.innerHTML = `
-                    <h3>Comments</h3>
-                    <div class="comments-list">
-                        ${post.comments.map(comment => `
-                            <div class="comment">
-                                <p class="comment-meta">By ${comment.username} on ${new Date(comment.created_at).toLocaleDateString()}</p>
-                                <p class="comment-content">${comment.content}</p>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
+            // After rendering the post, initialize the comments section
+            document.getElementById('comments-section').innerHTML = renderCommentSection(postId);
+            initializeComments(postId);
         });
 }
-
 
 function chatContent() {
     document.getElementById('content').innerHTML = `
@@ -442,6 +430,8 @@ function displayErrors(errors) {
 
 // Export initRouter and displayErrors for use in other modules
 export { initRouter, displayErrors, renderContent };
+
+
 
 
 

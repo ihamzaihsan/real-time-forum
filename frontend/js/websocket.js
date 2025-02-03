@@ -1,26 +1,36 @@
 import { initMessageHandlers } from './message.js';
 import { loadMessages } from './chat.js';
 import { renderContent } from './router.js';
+import { renderComments } from './comments.js';
 
-export class WebSocketClient {
-    constructor() {
-        this.socket = null;
-        this.messageHandlers = new Map();
-        this.messageHistory = new Map();
-        this.currentChatUser = null;
-        this.onlineUsers = new Map();
+  export class WebSocketClient {
+      constructor() {
+          this.socket = null;
+          this.messageHandlers = new Map();
+          this.messageHistory = new Map();
+          this.currentChatUser = null;
+          this.onlineUsers = new Map();
 
-        // Add default handlers right in the constructor
-        this.addMessageHandler('users_list', (content) => {
-            this.updateUsersList(content);
-        });
+          // Add default handlers right in the constructor
+          this.addMessageHandler('users_list', (content) => {
+              this.updateUsersList(content);
+          });
 
-        this.addMessageHandler('pong', (content) => {
-            console.log('Pong received:', content);
-        });
+          this.addMessageHandler('pong', (content) => {
+              console.log('Pong received:', content);
+          });
 
-        
-    }
+          // Add this to your WebSocketClient class constructor
+          this.addMessageHandler('new_comment', (content) => {
+              const commentsList = document.getElementById('commentsList');
+              if (commentsList) {
+                  const currentPostId = window.location.pathname.split('/')[2];
+                  if (currentPostId == content.post_id) {
+                      renderComments([content]);
+                  }
+              }
+          });
+      }
     connect() {
         console.log('Attempting WebSocket connection...');
         const sessionToken = localStorage.getItem('sessionToken');

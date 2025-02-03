@@ -547,6 +547,47 @@ nav ul li a.active {
     font-weight: 500;
 }
 
+.comments-section {
+    margin-top: 2rem;
+    padding: 1rem;
+}
+
+.comment-form {
+    margin-bottom: 1rem;
+}
+
+.comment-form textarea {
+    width: 100%;
+    min-height: 80px;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+}
+
+.comments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.comment {
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    color: #666;
+}
+
+.comment-actions {
+    margin-top: 0.5rem;
+    display: flex;
+    gap: 1rem;
+}
+
     
     
 
