@@ -21,14 +21,10 @@ func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
-	// Add after json.NewDecoder
-	log.Printf("Received post data: %+v", post)
-
-	// Get user_id from username
-	var userID int
-	err := database.DBInstance.DB.QueryRow("SELECT id FROM users WHERE username = ?", post.Username).Scan(&userID)
-	if err != nil {
-		http.Error(w, "User not found", http.StatusInternalServerError)
+	
+	userID := getUserIDFromSession(r)
+	if userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -40,12 +36,14 @@ func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
+		log.Printf("Database error 2: %v", err)
 		return
 	}
 
 	postID, err := result.LastInsertId()
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
+		log.Printf("Database error 3: %v", err)
 		return
 	}
 
@@ -56,6 +54,7 @@ func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
 		)
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
+			log.Printf("Database error 4: %v", err)
 			return
 		}
 	}

@@ -115,7 +115,15 @@ function homeContent() {
             });
         });
 }
-function createPostContent() {
+async function createPostContent() {
+    // Fetch categories from backend
+    const response = await fetch('/categories');
+    const categories = await response.json();
+    
+    const categoriesOptions = categories.map(category => 
+        `<option value="${category}">${category}</option>`
+    ).join('');
+
     document.getElementById('content').innerHTML = `
         <div class="create-post-container">
             <h2>Create New Post</h2>
@@ -124,11 +132,7 @@ function createPostContent() {
                 <textarea id="postContent" placeholder="Write your post here..." required></textarea>
                 <div class="categories-section">
                     <select id="categories" multiple>
-                        <option value="Technology">Technology</option>
-                        <option value="Science">Science</option>
-                        <option value="Sports">Sports</option>
-                        <option value="News">News</option>
-                        <option value="Entertainment">Entertainment</option>
+                        ${categoriesOptions}
                     </select>
                 </div>
                 <button type="submit">Create Post</button>
@@ -138,7 +142,6 @@ function createPostContent() {
 
     document.getElementById('createPostForm').addEventListener('submit', handleCreatePost);
 }
-
 function singlePostContent() {
     const postId = window.location.pathname.split('/')[2];
     

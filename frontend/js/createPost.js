@@ -11,8 +11,7 @@ export async function handleCreatePost(e) {
     const postData = {
         title,
         content,
-        categories,
-        username: localStorage.getItem('username')
+        categories
     };
 
     try {
