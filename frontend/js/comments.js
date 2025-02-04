@@ -74,6 +74,7 @@ export function initializeComments(postId) {
         });
     });
 }
+
 export function renderComments(comments) {
     const commentsList = document.getElementById('commentsList');
     if (!commentsList) return;
@@ -81,7 +82,6 @@ export function renderComments(comments) {
     const commentsArray = Array.isArray(comments) ? comments : [];
     
     commentsList.innerHTML = commentsArray.map(comment => {
-        // Ensure we have valid values or use defaults
         const timestamp = comment.created_at ? new Date(comment.created_at).toLocaleString() : 'Just now';
         const likes = typeof comment.likes === 'number' ? comment.likes : 0;
         const dislikes = typeof comment.dislikes === 'number' ? comment.dislikes : 0;
@@ -94,10 +94,15 @@ export function renderComments(comments) {
                 </div>
                 <div class="comment-content">${comment.content || ''}</div>
                 <div class="comment-actions">
-                    <span class="likes">👍 ${likes}</span>
-                    <span class="dislikes">👎 ${dislikes}</span>
+                    <button onclick="handleCommentLike(${comment.id}, true)" class="like-btn">
+                        👍 <span class="likes-count">${likes}</span>
+                    </button>
+                    <button onclick="handleCommentLike(${comment.id}, false)" class="dislike-btn">
+                        👎 <span class="dislikes-count">${dislikes}</span>
+                    </button>
                 </div>
             </div>
         `;
     }).join('');
 }
+

@@ -3,6 +3,7 @@ import { handleLoginSubmit } from './login.js';
 import { handleCreatePost } from './createPost.js';
 import { initializeScrollListener } from './chat.js';
 import { renderCommentSection, initializeComments } from './comments.js';
+import { handleLike } from './likes.js';
 
 // Route definitions: Map URL paths to corresponding content functions
 const routes = {
@@ -95,8 +96,8 @@ function homeContent() {
                             ${post.categories ? post.categories.map(cat => `<span class="category">${cat}</span>`).join('') : ''}
                         </div>
                         <div class="post-reactions">
-                            <span>👍 ${post.likes}</span>
-                            <span>👎 ${post.dislikes}</span>
+                            <span>👍 <span class="likes-count">${post.likes}</span></span>
+                            <span>👎 <span class="dislikes-count">${post.dislikes}</span></span>
                         </div>
                     </div>
                 `;
@@ -159,11 +160,14 @@ function singlePostContent() {
                     ${post.categories ? post.categories.map(cat => `<span class="category">${cat}</span>`).join('') : ''}
                 </div>
                 <div class="post-reactions">
-                    <span>👍 ${post.likes}</span>
-                    <span>👎 ${post.dislikes}</span>
+                    <button onclick="handleLike(${post.id}, true)" class="like-btn">
+                        👍 <span class="likes-count">${post.likes}</span>
+                    </button>
+                    <button onclick="handleLike(${post.id}, false)" class="dislike-btn">
+                        👎 <span class="dislikes-count">${post.dislikes}</span>
+                    </button>
                 </div>
             `;
-
             // After rendering the post, initialize the comments section
             document.getElementById('comments-section').innerHTML = renderCommentSection(postId);
             initializeComments(postId);
