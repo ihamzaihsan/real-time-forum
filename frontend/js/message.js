@@ -1,3 +1,5 @@
+import { showWindowNotification } from './notifications.js';
+
 export function initMessageHandlers(wsClient) {
     
     wsClient.addMessageHandler('users_list', (content) => {
@@ -25,6 +27,19 @@ export function initMessageHandlers(wsClient) {
             messageContainer.appendChild(messageElement);
             messageContainer.scrollTop = messageContainer.scrollHeight;
         }
+        
+        // Update notification badge
+        if (!window.location.pathname.includes('/chat')) {
+            const badge = document.getElementById('message-badge');
+            if (badge) {
+                const currentCount = parseInt(badge.textContent) || 0;
+                badge.textContent = currentCount + 1;
+                badge.style.display = 'inline';
+            }
+        }
+
+        // Show notification
+        showWindowNotification(content);
     });
     
 
@@ -55,6 +70,7 @@ export function initMessageHandlers(wsClient) {
         });
     }
 }
+
 export function createMessageElement(message) {
     const div = document.createElement('div');
     div.className = 'message';

@@ -3,35 +3,67 @@ import { loadMessages } from './chat.js';
 import { renderContent } from './router.js';
 import { renderComments } from './comments.js';
 
-  export class WebSocketClient {
-      constructor() {
-          this.socket = null;
-          this.messageHandlers = new Map();
-          this.messageHistory = new Map();
-          this.currentChatUser = null;
-          this.onlineUsers = new Map();
+    export class WebSocketClient {
+        constructor() {
+            this.socket = null;
+            this.messageHandlers = new Map();
+            this.messageHistory = new Map();
+            this.currentChatUser = null;
+            this.onlineUsers = new Map();
 
-          // Add default handlers right in the constructor
-          this.addMessageHandler('users_list', (content) => {
-              this.updateUsersList(content);
-          });
+            // Add default handlers right in the constructor
+            this.addMessageHandler('users_list', (content) => {
+                this.updateUsersList(content);
+            });
 
-          this.addMessageHandler('pong', (content) => {
-              console.log('Pong received:', content);
-          });
+            this.addMessageHandler('pong', (content) => {
+                console.log('Pong received:', content);
+            });
 
-          // Add this to your WebSocketClient class constructor
-          this.addMessageHandler('new_comment', (content) => {
-              const commentsList = document.getElementById('commentsList');
-              if (commentsList) {
-                  const currentPostId = window.location.pathname.split('/')[2];
-                  if (currentPostId == content.post_id) {
-                      renderComments([content]);
-                  }
-              }
-          });
-      }
-    connect() {
+            // Add this to your WebSocketClient class constructor
+            this.addMessageHandler('new_comment', (content) => {
+                const commentsList = document.getElementById('commentsList');
+                if (commentsList) {
+                    const currentPostId = window.location.pathname.split('/')[2];
+                    if (currentPostId == content.post_id) {
+                        renderComments([content]);
+                    }
+                }
+            });
+
+            this.addMessageHandler('private_message', (content) => {
+                // Show notification if user is not in chat page
+                if (!window.location.pathname.includes('/chat')) {
+                    this.showNotification(content);
+                }
+            });
+        }
+
+        showNotification(message) {
+            // Check if browser supports notifications
+            if (!("Notification" in window)) return;
+
+            // Request permission if needed
+            if (Notification.permission !== "granted") {
+                Notification.requestPermission();
+            }
+
+            if (Notification.permission === "granted") {
+                const notification = new Notification("New Message", {
+                    body: `${message.sender_name}: ${message.message}`,
+                    icon: "/path/to/icon.png"  // Add your notification icon
+                });
+
+                // Click notification to open chat
+                notification.onclick = () => {
+                    window.focus();
+                    window.history.pushState({}, '', '/chat');
+                    renderContent('/chat');
+                };
+            }
+        }    
+        
+        connect() {
         console.log('Attempting WebSocket connection...');
         const sessionToken = localStorage.getItem('sessionToken');
 
@@ -90,25 +122,17 @@ import { renderComments } from './comments.js';
     
     
     sendPrivateMessage(receiverId, content) {
-        // Check if the receiver is online before sending
-        const usersList = document.getElementById('onlineUsers');
-        const userElement = usersList.querySelector(`[data-userid="${receiverId}"]`);
-        const isOffline = userElement?.classList.contains('offline');
-    
-        if (isOffline) {
-            alert('Cannot send message. User is offline');
-            return;
-        }
-    
         const timestamp = new Date().toISOString();
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.sendMessage('private_message', {
                 receiver_id: receiverId,
                 message: content,
+                username: localStorage.getItem('username'),  
                 timestamp: timestamp,
             });
         }
     }
+    
     
 
     updateUsersList(users) {
