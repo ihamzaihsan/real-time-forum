@@ -4,6 +4,7 @@ import { handleCreatePost } from './createPost.js';
 import { initializeScrollListener } from './chat.js';
 import { renderCommentSection, initializeComments } from './comments.js';
 import { handleLike } from './likes.js';
+import { loadProfileData } from './profile.js';
 
 // Route definitions: Map URL paths to corresponding content functions
 const routes = {
@@ -13,9 +14,10 @@ const routes = {
     '/login': { component: loginContent, requiresAuth: false },
     '/chat': { component: chatContent, requiresAuth: true },
     '/post/:id': { component: singlePostContent, requiresAuth: true  },
-    '/create_post': { component: createPostContent, requiresAuth: true }
-};
+    '/create_post': { component: createPostContent, requiresAuth: true },
+    '/profile': { component: profileContent, requiresAuth: true }
 
+};
 function renderContent(path) {
     const isAuthenticated = checkAuth();
     
@@ -115,6 +117,36 @@ function homeContent() {
             });
         });
 }
+
+function profileContent() {
+    document.getElementById('content').innerHTML = `
+        <div class="profile-container">
+            <div class="profile-header">
+                <div id="profileAvatar" class="profile-avatar"></div>
+                <div class="profile-info">
+                    <h2 id="fullName"></h2>
+                    <p id="username"></p>
+                </div>
+            </div>
+            <div class="profile-details">
+                <div class="detail-row">
+                    <span class="label">Email:</span>
+                    <span id="profileEmail"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Age:</span>
+                    <span id="profileAge"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Gender:</span>
+                    <span id="profileGender"></span>
+                </div>
+            </div>
+        </div>
+    `;
+    loadProfileData();
+}
+
 async function createPostContent() {
     // Fetch categories from backend
     const response = await fetch('/categories');
@@ -365,6 +397,7 @@ async function logoutContent(event) {
 function updateNavigation() {
     const sessionToken = localStorage.getItem('sessionToken');
     const homeLink = document.querySelector('a[href="/"]');
+    const profileLink = document.querySelector('a[href="/profile"]');
     const registerLink = document.querySelector('a[href="/register"]');
     const logoutLink = document.querySelector('a[href="/logout"]');
     const loginLink = document.querySelector('a[href="/login"]');
@@ -372,12 +405,14 @@ function updateNavigation() {
     
     if (sessionToken) {
         if (homeLink) homeLink.style.display = 'block';
+        if (profileLink) profileLink.style.display = 'block';
         if (registerLink) registerLink.style.display = 'none';
         if (logoutLink) logoutLink.style.display = 'block';
         if (loginLink) loginLink.style.display = 'none';
         if (createPostLink) createPostLink.style.display = 'block';
     } else {
         if (homeLink) homeLink.style.display = 'none';
+        if (profileLink) profileLink.style.display = 'none';
         if (registerLink) registerLink.style.display = 'block';
         if (logoutLink) logoutLink.style.display = 'none';
         if (loginLink) loginLink.style.display = 'block';
@@ -441,6 +476,8 @@ function displayErrors(errors) {
 
 // Export initRouter and displayErrors for use in other modules
 export { initRouter, displayErrors, renderContent };
+
+
 
 
 

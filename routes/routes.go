@@ -27,5 +27,6 @@ func InitRoutes() {
 	http.HandleFunc("/like", handlers.ServeLike)
 	http.HandleFunc("/comment/like", handlers.ServeCommentLike)
 	http.HandleFunc("/categories", handlers.ServeCategories)
+	http.HandleFunc("/profile", handlers.ServeProfile)
 
 }
