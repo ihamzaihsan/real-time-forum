@@ -135,3 +135,14 @@ export function loadMoreMessages() {
         });
         messageHistory.scrollTop = messageHistory.scrollHeight;
     }
+
+export function chatContent() {
+    // ... existing code ...
+    
+    // Reset notification badge
+    const badge = document.getElementById('message-badge');
+    if (badge) {
+        badge.textContent = '0';
+        badge.style.display = 'none';
+    }
+}

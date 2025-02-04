@@ -384,7 +384,6 @@ function updateNavigation() {
         if (createPostLink) createPostLink.style.display = 'none';
     }
 }
-
 // Initialize router: Set up event listeners for navigation links
 function initRouter() {
     document.querySelectorAll('a').forEach(link => {

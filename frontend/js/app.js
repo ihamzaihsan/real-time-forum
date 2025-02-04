@@ -4,12 +4,14 @@
 import { initRouter } from './router.js';
 import { WebSocketClient } from './websocket.js';
 import { initMessageHandlers } from './message.js';
+import { initNotifications } from './notifications.js';
 
 // Initialize the router when the DOM content is loaded
 document.addEventListener('DOMContentLoaded', () => {
     const wsClient = new WebSocketClient();
     initRouter();
     initMessageHandlers(wsClient);
+    initNotifications();
     wsClient.connect(); 
     
 

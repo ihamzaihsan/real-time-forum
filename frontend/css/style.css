@@ -251,23 +251,23 @@ nav ul li a.active {
     
 
       /* For Webkit browsers (Chrome, Safari) */
-      #messageHistory::-webkit-scrollbar {
-          width: 8px;
-      }
+        #messageHistory::-webkit-scrollbar {
+        width: 8px;
+        }
 
-      #messageHistory::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 4px;
-      }
+        #messageHistory::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
 
-      #messageHistory::-webkit-scrollbar-thumb {
-          background: #888;
-          border-radius: 4px;
-      }
+        #messageHistory::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
 
-      #messageHistory::-webkit-scrollbar-thumb:hover {
-          background: #555;
-      }
+        #messageHistory::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
     #messageForm {
         display: flex;
         padding: 20px;
@@ -319,6 +319,7 @@ nav ul li a.active {
         margin-right: auto;
         border-bottom-left-radius: 4px;
     }
+        
 
     .message-time {
         font-size: 12px;
@@ -613,7 +614,55 @@ nav ul li a.active {
     gap: 1rem;
 }
 
-    
+/* notification design */ 
+
+.notification-container {
+    position: fixed;
+    top: 80px; /* Positioned below the nav bar */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.notification {
+    background: #2c3e50;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    min-width: 300px;
+    text-align: center;
+}
+
+.notification.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.notification-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.notification strong {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.notification p {
+    margin: 0;
+    font-size: 14px;
+}
+
     
 
 
