@@ -5,6 +5,7 @@ import { initializeScrollListener } from './chat.js';
 import { renderCommentSection, initializeComments } from './comments.js';
 import { handleLike } from './likes.js';
 import { loadProfileData } from './profile.js';
+import { sendPrivateMessage } from './message.js';
 
 // Route definitions: Map URL paths to corresponding content functions
 const routes = {
@@ -233,7 +234,7 @@ function chatContent() {
             const content = messageInput.value.trim();
             
             if (content && window.wsClient && window.wsClient.currentChatUser) {
-                window.wsClient.sendPrivateMessage(window.wsClient.currentChatUser, content);
+                sendPrivateMessage(window.wsClient.socket, window.wsClient.currentChatUser, content);
                 messageInput.value = '';
                 
                 // Add message to UI immediately
@@ -473,7 +474,6 @@ function displayErrors(errors) {
     form.insertBefore(errorDiv, form.firstChild);
 }
 
-// Export initRouter and displayErrors for use in other modules
 export { initRouter, displayErrors, renderContent };
 
 

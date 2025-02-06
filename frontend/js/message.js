@@ -1,15 +1,10 @@
 import { showWindowNotification } from './notifications.js';
-
+import { updateUsersList } from './chat.js';
 export function initMessageHandlers(wsClient) {
-    
     wsClient.addMessageHandler('users_list', (content) => {
-        wsClient.updateUsersList(content);
+        updateUsersList(wsClient, content);
     });
 
-    // Add handler for pong messages
-    wsClient.addMessageHandler('pong', (content) => {
-        console.log('Received pong response:', content);
-    });
     wsClient.addMessageHandler('private_message', (content) => {
         const messageContainer = document.getElementById('messageHistory');
         if (wsClient.currentChatUser && messageContainer) {
@@ -28,7 +23,6 @@ export function initMessageHandlers(wsClient) {
             messageContainer.scrollTop = messageContainer.scrollHeight;
         }
         
-        // Update notification badge
         if (!window.location.pathname.includes('/chat')) {
             const badge = document.getElementById('message-badge');
             if (badge) {
@@ -36,12 +30,9 @@ export function initMessageHandlers(wsClient) {
                 badge.textContent = currentCount + 1;
                 badge.style.display = 'inline';
             }
+            showWindowNotification(content);
         }
-
-        // Show notification
-        showWindowNotification(content);
     });
-    
 
     const messageForm = document.getElementById('messageForm');
     if (messageForm) {
@@ -51,7 +42,7 @@ export function initMessageHandlers(wsClient) {
             const content = messageInput.value.trim();
             
             if (content && wsClient.currentChatUser) {
-                wsClient.sendPrivateMessage(wsClient.currentChatUser, content);
+                sendPrivateMessage(wsClient.socket, wsClient.currentChatUser, content);
                 
                 const messageHistory = document.getElementById('messageHistory');
                 const messageElement = document.createElement('div');
@@ -71,6 +62,7 @@ export function initMessageHandlers(wsClient) {
     }
 }
 
+
 export function createMessageElement(message) {
     const div = document.createElement('div');
     div.className = 'message';
@@ -80,4 +72,19 @@ export function createMessageElement(message) {
         <span class="timestamp">${new Date(message.created_at).toLocaleTimeString()}</span>
     `;
     return div;
+}
+
+export function sendPrivateMessage(socket, receiverId, content) {
+    const timestamp = new Date().toISOString();
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+            type: 'private_message',
+            content: {
+                receiver_id: receiverId,
+                message: content,
+                username: localStorage.getItem('username'),
+                timestamp: timestamp
+            }
+        }));
+    }
 }

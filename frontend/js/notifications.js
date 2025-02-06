@@ -28,3 +28,27 @@ export function showWindowNotification(content) {
         setTimeout(() => notification.remove(), 300);
     }, 5000);
 }
+
+export function showNotification(message) {
+    // Check if browser supports notifications
+    if (!("Notification" in window)) return;
+
+    // Request permission if needed
+    if (Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+
+    if (Notification.permission === "granted") {
+        const notification = new Notification("New Message", {
+            body: `${message.sender_name}: ${message.message}`,
+            icon: "/path/to/icon.png"  // Add your notification icon
+        });
+
+        // Click notification to open chat
+        notification.onclick = () => {
+            window.focus();
+            window.history.pushState({}, '', '/chat');
+            renderContent('/chat');
+        };
+    }
+} 

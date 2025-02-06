@@ -1,5 +1,5 @@
 import { WebSocketClient } from './websocket.js';
-
+import { renderContent } from './router.js';
  // Add this variable to track if we're currently loading messages
     let isLoadingMessages = false;
 
@@ -136,13 +136,47 @@ export function loadMoreMessages() {
         messageHistory.scrollTop = messageHistory.scrollHeight;
     }
 
-export function chatContent() {
-    // ... existing code ...
+export function updateUsersList(wsClient, users) {
+    const usersList = document.getElementById('onlineUsers');
+    if (!usersList) return;
+
+    usersList.innerHTML = '';
+    users.forEach((user) => {
+        const userElement = document.createElement('div');
+        userElement.className = `user-item ${user.isOnline ? 'online' : 'offline'}`;
+        userElement.setAttribute('data-userid', user.id);
+        userElement.innerHTML = `
+            <span class="user-status"></span>
+            <span class="user-name">${user.username}</span>
+        `;
+        
+        if (user.isOnline) {
+            userElement.addEventListener('click', () => {
+                const messageHistory = document.getElementById('messageHistory');
+                if (messageHistory) {
+                    messageHistory.innerHTML = '';
+                }
+                
+                document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
+                userElement.classList.add('active');
+                
+                const selectedUserName = document.getElementById('selectedUserName');
+                if (selectedUserName) {
+                    selectedUserName.textContent = user.username;
+                }
     
-    // Reset notification badge
-    const badge = document.getElementById('message-badge');
-    if (badge) {
-        badge.textContent = '0';
-        badge.style.display = 'none';
-    }
+                wsClient.currentChatUser = user.id;
+                loadMessages(wsClient, user.id);  
+                
+                const messageForm = document.getElementById('messageForm');
+                if (messageForm) {
+                    messageForm.style.display = 'flex';
+                }
+
+                window.history.pushState({}, '', '/chat');
+                renderContent('/chat');
+            });
+        }
+        usersList.appendChild(userElement);
+    });
 }
