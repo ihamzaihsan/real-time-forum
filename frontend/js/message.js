@@ -7,7 +7,11 @@ export function initMessageHandlers(wsClient) {
 
     wsClient.addMessageHandler('private_message', (content) => {
         const messageContainer = document.getElementById('messageHistory');
-        if (wsClient.currentChatUser && messageContainer) {
+        // Only display message if it's from the current chat user
+        if (wsClient.currentChatUser && 
+            messageContainer && 
+            (Number(content.sender_id) === wsClient.currentChatUser ||  Number(content.sender_id) === parseInt(localStorage.getItem('userId')))) {
+            
             const currentUserId = parseInt(localStorage.getItem('userId'));
             const messageElement = document.createElement('div');
             const isCurrentUser = Number(content.sender_id) === currentUserId;
@@ -23,7 +27,9 @@ export function initMessageHandlers(wsClient) {
             messageContainer.scrollTop = messageContainer.scrollHeight;
         }
         
-        if (!window.location.pathname.includes('/chat')) {
+        // Show notification for messages from other users when not in their chat
+        if (!window.location.pathname.includes('/chat') || 
+            Number(content.sender_id) !== wsClient.currentChatUser) {
             const badge = document.getElementById('message-badge');
             if (badge) {
                 const currentCount = parseInt(badge.textContent) || 0;
@@ -33,7 +39,6 @@ export function initMessageHandlers(wsClient) {
             showWindowNotification(content);
         }
     });
-
     const messageForm = document.getElementById('messageForm');
     if (messageForm) {
         messageForm.addEventListener('submit', (e) => {

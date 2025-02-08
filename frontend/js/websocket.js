@@ -11,7 +11,7 @@ import { renderComments } from './comments.js';
             this.messageHistory = new Map();
             this.currentChatUser = null;
             this.onlineUsers = new Map();
-        
+
             // Add this to your WebSocketClient class constructor
             this.addMessageHandler('new_comment', (content) => {
                 const commentsList = document.getElementById('commentsList');
