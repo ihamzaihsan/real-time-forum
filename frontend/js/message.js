@@ -1,7 +1,13 @@
 import { showWindowNotification } from './notifications.js';
 import { updateUsersList } from './chat.js';
+import { renderContent } from './router.js';
 export function initMessageHandlers(wsClient) {
     wsClient.addMessageHandler('users_list', (content) => {
+        // Populate the onlineUsers Map
+        content.forEach(user => {
+            wsClient.onlineUsers.set(user.id, user.isOnline);
+        });
+        
         updateUsersList(wsClient, content);
     });
 
@@ -47,25 +53,28 @@ export function initMessageHandlers(wsClient) {
             const content = messageInput.value.trim();
             
             if (content && wsClient.currentChatUser) {
-                sendPrivateMessage(wsClient.socket, wsClient.currentChatUser, content);
-                
-                const messageHistory = document.getElementById('messageHistory');
-                const messageElement = document.createElement('div');
-                messageElement.className = 'message sent';
-                messageElement.innerHTML = `
-                    <div class="message-content">
-                        <span class="message-text">${content}</span>
-                        <span class="message-time">${new Date().toLocaleTimeString()}</span>
-                    </div>
-                `;
-                messageHistory.appendChild(messageElement);
-                messageHistory.scrollTop = messageHistory.scrollHeight;
-                
+                const isReceiverOnline = wsClient.onlineUsers.get(Number(wsClient.currentChatUser));
+                if (isReceiverOnline) {
+                    let messageSent = sendPrivateMessage(wsClient.socket, wsClient.currentChatUser, content);
+                    if (messageSent){
+                        messageInput.value = '';
+                    }
+                    const messageHistory = document.getElementById('messageHistory');
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'message sent';
+                    messageElement.innerHTML = `
+                        <div class="message-content">
+                            <span class="message-text">${content}</span>
+                            <span class="message-time">${new Date().toLocaleTimeString()}</span>
+                        </div>
+                    `;
+                    messageHistory.appendChild(messageElement);
+                    messageHistory.scrollTop = messageHistory.scrollHeight;
+                }
                 messageInput.value = '';
             }
         });
-    }
-}
+    }}
 
 
 export function createMessageElement(message) {
@@ -81,6 +90,14 @@ export function createMessageElement(message) {
 
 export function sendPrivateMessage(socket, receiverId, content) {
     const timestamp = new Date().toISOString();
+    
+    const isReceiverOnline = window.wsClient.onlineUsers.get(Number(receiverId));
+    if (!isReceiverOnline) {
+        window.history.pushState({}, '', '/');
+        renderContent('/');
+        return false;
+    }
+
     if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({
             type: 'private_message',
@@ -91,5 +108,7 @@ export function sendPrivateMessage(socket, receiverId, content) {
                 timestamp: timestamp
             }
         }));
+        return true;
     }
+    return false;
 }

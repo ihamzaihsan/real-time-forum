@@ -234,8 +234,11 @@ function chatContent() {
             const content = messageInput.value.trim();
             
             if (content && window.wsClient && window.wsClient.currentChatUser) {
-                sendPrivateMessage(window.wsClient.socket, window.wsClient.currentChatUser, content);
+                let success = sendPrivateMessage(window.wsClient.socket, window.wsClient.currentChatUser, content);
                 messageInput.value = '';
+                if(!success){
+                    return;
+                }
                 
                 // Add message to UI immediately
                 const messageHistory = document.getElementById('messageHistory');
