@@ -1,8 +1,9 @@
-export async function loadProfileData() {
+export async function loadProfileData(userId) {
     try {
-        const response = await fetch('/profile', {
+        const response = await fetch(`/profile/${userId}`, {
             headers: {
-                'Authorization': localStorage.getItem('sessionToken')
+                'Authorization': localStorage.getItem('sessionToken'),
+                'Accept': 'application/json'
             }
         });
         
@@ -23,6 +24,7 @@ export async function loadProfileData() {
         document.getElementById('profileEmail').textContent = profileData.email;
         document.getElementById('profileAge').textContent = profileData.age;
         document.getElementById('profileGender').textContent = profileData.gender;
+        
     } catch (error) {
         console.error('Error loading profile:', error);
     }

@@ -9,6 +9,13 @@ import (
 )
 
 func ServePostByID(w http.ResponseWriter, r *http.Request) {
+	acceptHeader := r.Header.Get("Accept")
+	isBrowserRequest := strings.Contains(acceptHeader, "text/html")
+
+	if isBrowserRequest {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
 
     postID := strings.TrimPrefix(r.URL.Path, "/post/")
 

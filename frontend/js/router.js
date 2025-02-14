@@ -16,12 +16,24 @@ const routes = {
     '/chat': { component: chatContent, requiresAuth: true },
     '/post/:id': { component: singlePostContent, requiresAuth: true  },
     '/create_post': { component: createPostContent, requiresAuth: true },
-    '/profile': { component: profileContent, requiresAuth: true }
+    '/profile/:id': { component: profileContent, requiresAuth: true }
 
 };
 function renderContent(path) {
     const isAuthenticated = checkAuth();
     
+    // Handle profile route
+    const profileMatch = path.match(/^\/profile\/(\d+)$/);
+    if (profileMatch) {
+        if (!isAuthenticated) {
+            window.history.pushState({}, '', '/login');
+            routes['/login'].component();
+            return;
+        }
+        profileContent();
+        return;
+    }
+
     // Handle dynamic routes first
     const postMatch = path.match(/^\/post\/(\d+)$/);
     if (postMatch) {
@@ -73,7 +85,8 @@ function renderContent(path) {
         // Normal route handling
         route.component();
     }
-}function checkAuth() {
+}
+function checkAuth() {
     const sessionToken = localStorage.getItem('sessionToken');
     return !!sessionToken;
 }
@@ -120,6 +133,13 @@ function homeContent() {
 }
 
 function profileContent() {
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+        window.history.pushState({}, '', '/login');
+        loginContent();
+        return;
+    }
+
     document.getElementById('content').innerHTML = `
         <div class="profile-container">
             <div class="profile-header">
@@ -145,9 +165,8 @@ function profileContent() {
             </div>
         </div>
     `;
-    loadProfileData();
+    loadProfileData(userId);
 }
-
 async function createPostContent() {
     // Fetch categories from backend
     const response = await fetch('/categories');
@@ -408,8 +427,13 @@ function updateNavigation() {
     const createPostLink = document.querySelector('a[href="/create_post"]');
     
     if (sessionToken) {
+        // Get current user ID from localStorage or fetch it
+        const userId = localStorage.getItem('userId');
         if (homeLink) homeLink.style.display = 'block';
-        if (profileLink) profileLink.style.display = 'block';
+        if (profileLink) {
+            profileLink.href = `/profile/${userId}`;
+            profileLink.style.display = 'block';
+        }
         if (registerLink) registerLink.style.display = 'none';
         if (logoutLink) logoutLink.style.display = 'block';
         if (loginLink) loginLink.style.display = 'none';
@@ -427,29 +451,28 @@ function updateNavigation() {
 function initRouter() {
     document.querySelectorAll('a').forEach(link => {
         const path = link.getAttribute('href');
-
+        
         if (path === '/logout') {
-            // Attach the logout handler for the logout link
             link.addEventListener('click', logoutContent);
+        } else if (path.startsWith('/profile')) {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const userId = localStorage.getItem('userId');
+                window.history.pushState({}, '', `/profile/${userId}`);
+                profileContent();
+            });
         } else {
-            // Attach the route handler for all other links
             link.addEventListener('click', handleRoute);
         }
     });
 
-    // Listen for back/forward navigation using browser history
     window.onpopstate = () => {
         renderContent(window.location.pathname);
     };
 
-    // Handle initial page load (render the content for the current URL)
     renderContent(window.location.pathname);
-
-    // Update navigation UI on URL changes
     updateNavigation();
-    window.addEventListener('popstate', updateNavigation);
-}
-function throttle(func, limit) {
+}function throttle(func, limit) {
     let inThrottle;
     return function(...args) {
         if (!inThrottle) {
