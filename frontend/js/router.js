@@ -93,8 +93,8 @@ function checkAuth() {
 
 function homeContent() {
     document.getElementById('content').innerHTML = `
-        <div class="home-container">
-            <div id="posts-container" class="posts-container"></div>
+        <div class="posts-wrapper">
+            <div id="posts-container" class="posts-list"></div>
         </div>
     `;
 
@@ -103,7 +103,9 @@ function homeContent() {
         .then(posts => {
             const postsContainer = document.getElementById('posts-container');
             posts.forEach(post => {
-                postsContainer.innerHTML += `
+                const postWrapper = document.createElement('div');
+                postWrapper.className = 'posts-container';
+                postWrapper.innerHTML = `
                     <div class="post-card" data-post-id="${post.id}">
                         <h2>${post.title}</h2>
                         <p class="post-meta">Posted by ${post.username} on ${new Date(post.created_at).toLocaleDateString()}</p>
@@ -117,6 +119,7 @@ function homeContent() {
                         </div>
                     </div>
                 `;
+                postsContainer.appendChild(postWrapper);
             });
 
             // Add click event listeners after adding posts
@@ -131,7 +134,6 @@ function homeContent() {
             });
         });
 }
-
 function profileContent() {
     const userId = localStorage.getItem('userId');
     if (!userId) {

@@ -44,6 +44,9 @@ import { loadProfileData } from './profile.js';
 
     function initSessionValidator() {
         setInterval(async () => {
+            if (window.location.pathname === '/register' || window.location.pathname === '/login') {
+                return;
+            }
             const response = await fetch('/check-auth');
             if (!response.ok) {
                 localStorage.clear();

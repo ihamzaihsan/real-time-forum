@@ -3,6 +3,7 @@ body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
+    overflow: hidden; /* Removes main scroll */
 }
 
 /* Modern navigation styling */
@@ -20,17 +21,14 @@ nav {
 nav ul {
     list-style: none;
     padding: 0;
-
     margin: 0;
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     gap: 1rem;
 }
 
 nav ul li {
-
-
     display: inline-block;
     padding: 0;
 }
@@ -39,12 +37,12 @@ nav ul li a {
 
     color: #ecf0f1;
     text-decoration: none;
-
     padding: 1rem 1.5rem;
     display: inline-block;
     font-weight: 500;
     transition: all 0.3s ease;
     border-radius: 4px;
+    font-size: larger;
 }
 
 nav ul li a:hover {
@@ -198,6 +196,8 @@ nav ul li a.active {
         background: #f5f5f5;
     }
 
+    
+
     .online-users-sidebar {
         width: 250px;
         background: #f5f5f5;
@@ -211,6 +211,37 @@ nav ul li a.active {
         border-bottom: 1px solid #e0e0e0;
         color: #333;
     }
+
+    .online-users-sidebar {
+        position: relative;
+        width: 250px;
+        height: calc(100vh - 60px);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #888 #f1f1f1;
+        padding-right: 10px;
+        z-index: 2;
+    }
+    
+    .online-users-sidebar::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .online-users-sidebar::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    
+    .online-users-sidebar::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+    
+    .online-users-sidebar::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    
+    
 
     .chat-main {
         height: 100%;
@@ -469,15 +500,72 @@ nav ul li a.active {
     /* post desing in home page */
 
     /* Posts Container */
+
+    .posts-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        align-items: center;
+        padding: 2rem;
+    }
+    
+    .posts-list {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        width: 100%;
+        align-items: center;
+    }
     .posts-container {
-        width: 90% !important;
-        max-width: 1600px !important;  
-        margin: 0 auto;
-        padding: 20px;
+        position: relative;
+        width: 1000px;
+        height: 400px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: repeating-conic-gradient(from var(--a), #ff2770 0%,
+                        #ff2770 5%, transparent 5%, transparent 35%, #ff2770 50%);
+        animation: animate 4s linear infinite;
+        border-radius: 20px;
+        }
+    .posts-container::before{
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background: repeating-conic-gradient(from var(--a), #45f3ff 0%,
+                    #45f3ff 5%, transparent 5%, transparent 35%, #45f3ff 50%);
+        animation: animate 4s linear infinite;
+        border-radius: 20px;
+        animation-delay: -1s;
+    }
+    
+    .posts-container::after{
+        content: '';
+        position: absolute;
+        inset: 8px;
+        background: #fff;
+        border-radius: 15px;
+        border: 9px solid #25252b;
+    } 
+    
+    @property --a{
+        syntax: '<angle>';
+        inherits: false;
+        initial-value: 0deg;
+    }
+    @keyframes animate {
+        0%{
+            --a: 0deg;
+        }
+    
+        100%{
+            --a: 360deg;
+        }
+        
     }
 
     .post-card {
-        background: white;
         border-radius: 12px;
         padding: 30px;      /* Increased padding */
         margin-bottom: 30px;
@@ -485,6 +573,7 @@ nav ul li a.active {
         transition: transform 0.2s, box-shadow 0.2s;
         width: 100%;        /* Ensure full width */
         min-height: 200px;  /* Minimum height */
+        z-index: 10000;
     }
 
 .post-card:hover {
@@ -498,6 +587,38 @@ nav ul li a.active {
     margin-bottom: 12px;
     font-weight: 600;
 }
+
+.posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+    align-items: center;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    padding: 20px;
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+}
+
+.posts-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.posts-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.posts-list::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.posts-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
 
 .post-meta {
     color: #7f8c8d;
