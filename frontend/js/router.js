@@ -142,6 +142,10 @@ function profileContent() {
         return;
     }
 
+    // Get the main container
+    const mainContainer = document.querySelector('.main-container');
+    
+    // Set the content
     document.getElementById('content').innerHTML = `
         <div class="profile-container">
             <div class="profile-header">
@@ -167,8 +171,11 @@ function profileContent() {
             </div>
         </div>
     `;
+    
     loadProfileData(userId);
 }
+
+
 async function createPostContent() {
     // Fetch categories from backend
     const response = await fetch('/categories');

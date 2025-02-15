@@ -509,13 +509,6 @@ nav ul li a.active {
         padding: 2rem;
     }
     
-    .posts-list {
-        display: flex;
-        flex-direction: column;
-        gap: 2rem;
-        width: 100%;
-        align-items: center;
-    }
     .posts-container {
         position: relative;
         width: 1000px;
@@ -594,7 +587,7 @@ nav ul li a.active {
     gap: 2rem;
     width: 100%;
     align-items: center;
-    max-height: calc(100vh - 100px);
+    height: 85vh;
     overflow-y: auto;
     padding: 20px;
     scrollbar-width: thin;
