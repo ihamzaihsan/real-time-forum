@@ -240,6 +240,16 @@ function singlePostContent() {
 }
 
 function chatContent() {
+    const pageLoadCount = sessionStorage.getItem('chatPageLoad');
+
+    if (!pageLoadCount) {
+        sessionStorage.setItem('chatPageLoad', '1');
+    } else if (window.location.pathname === '/chat') {
+        sessionStorage.removeItem('chatPageLoad');
+        window.history.pushState({}, '', '/');
+        routes['/'].component();
+        return;
+    }
     document.getElementById('content').innerHTML = `
         <div class="chat-main">
             <div id="selectedUserName" class="selected-user"></div>
