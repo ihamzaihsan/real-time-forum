@@ -29,6 +29,29 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
+
+	// Check if user exists and get their email
+	var userEmail string
+	err := database.DBInstance.DB.QueryRow(
+		"SELECT email FROM users WHERE username = ? OR email = ?",
+		loginReq.Username, loginReq.Username,
+	).Scan(&userEmail)
+	if err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if email already has an active session
+	var sessionCount int
+	err = database.DBInstance.DB.QueryRow(
+		"SELECT COUNT(*) FROM sessions WHERE email = ? AND expires_at > ?",
+		userEmail, time.Now(),
+	).Scan(&sessionCount)
+	if err == nil && sessionCount > 0 {
+		http.Error(w, "User is already logged in", http.StatusBadRequest)
+		return
+	}
+
 	loginReq.Username = strings.TrimSpace(loginReq.Username)
 	loginReq.Password = strings.TrimSpace(loginReq.Password)
 
@@ -43,7 +66,7 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		Password string
 		Email    string
 	}
-	err := database.DBInstance.DB.QueryRow(
+	err = database.DBInstance.DB.QueryRow(
 		"SELECT id, password, email FROM users WHERE username = ? OR email = ?",
 		loginReq.Username, loginReq.Username,
 	).Scan(&user.ID, &user.Password, &user.Email)

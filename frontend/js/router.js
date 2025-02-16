@@ -370,34 +370,40 @@ function registerContent() {
 
 function loginContent() {
     document.body.className = 'login-page';
-    // Check if user is already logged in
     const sessionToken = localStorage.getItem('sessionToken');
     if (sessionToken) {
-        // Redirect to home page if already authenticated
         window.history.pushState({}, '', '/');
         renderContent('/');
         return;
     }
 
-    // Show login form only if not authenticated
     document.getElementById('content').innerHTML = `
-        <div class="login-container">
-            <h1>Login</h1>
-            <form id="loginForm" class="login-form">
-                <div class="form-group">
-                    <input type="text" id="username" placeholder="Username or Email" required>
+        <div class="login-wrapper">
+            <div class="login-container">
+                <div class="login-header">
+                    <h1>Welcome Back</h1>
+                    <p>Please login to your account</p>
                 </div>
-                <div class="form-group">
-                    <input type="password" id="password" placeholder="Password" required>
-                </div>
-                <button type="submit" class="login-btn">Login</button>
-            </form>
+                <form id="loginForm" class="login-form">
+                    <div class="form-group">
+                        <label for="username">Username or Email</label>
+                        <input type="text" id="username" placeholder="Enter your username or email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="login-btn">Sign In</button>
+                    <div class="form-footer">
+                        <p>Don't have an account? <a href="/register" class="register-link">Create Account</a></p>
+                    </div>
+                </form>
+            </div>
         </div>
     `;
 
     document.getElementById('loginForm').addEventListener('submit', handleLoginSubmit);
-}
-// Handle navigation when a link is clicked
+}// Handle navigation when a link is clicked
 function handleRoute(event) {
     event.preventDefault();
     const path = event.target.getAttribute('href');
