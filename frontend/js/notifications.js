@@ -41,7 +41,7 @@ export function showNotification(message) {
     if (Notification.permission === "granted") {
         const notification = new Notification("New Message", {
             body: `${message.sender_name}: ${message.message}`,
-            icon: "/path/to/icon.png"  // Add your notification icon
+            icon: "/path/to/icon.png"  // if we want to add icon to the notification
         });
 
         // Click notification to open chat

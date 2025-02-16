@@ -820,8 +820,41 @@ nav ul li a.active {
     font-weight: bold;
     width: 120px;
 }
-   
-    
+
+.typing-indicator {
+    position: relative;
+    background: #e6f2ff;
+    border-radius: 15px;
+    padding: 8px 15px;
+    margin: 10px;
+    display: none;
+    max-width: 200px;
+    font-style: italic;
+    color: #4a4a4a;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.typing-indicator:before {
+    content: "";
+    position: absolute;
+    bottom: -10px;
+    left: 15px;
+    border-width: 10px 10px 0;
+    border-style: solid;
+    border-color: #e6f2ff transparent;
+}
+
+.typing-indicator:after {
+    content: "";
+    position: absolute;
+    bottom: -8px;
+    left: 17px;
+    border-width: 8px 8px 0;
+    border-style: solid;
+    border-color: #e6f2ff transparent;
+}
+
+
 
 
 /* Responsive design */

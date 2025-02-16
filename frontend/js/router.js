@@ -21,7 +21,7 @@ const routes = {
 };
 function renderContent(path) {
     const isAuthenticated = checkAuth();
-    
+
     // Handle profile route
     const profileMatch = path.match(/^\/profile\/(\d+)$/);
     if (profileMatch) {
@@ -85,6 +85,7 @@ function renderContent(path) {
         // Normal route handling
         route.component();
     }
+
 }
 function checkAuth() {
     const sessionToken = localStorage.getItem('sessionToken');
@@ -243,13 +244,13 @@ function chatContent() {
         <div class="chat-main">
             <div id="selectedUserName" class="selected-user"></div>
             <div class="chat-messages" id="messageHistory"></div>
+            <div id="typingIndicator" class="typing-indicator"></div>
             <form id="messageForm" class="chat-input">
                 <input type="text" id="messageInput" placeholder="Type a message...">
                 <button type="submit">Send</button>
             </form>
         </div>
     `;
-
     initializeScrollListener();
     
 
@@ -288,9 +289,38 @@ function chatContent() {
     if (window.wsClient) {
         window.wsClient.connect();
     }
+
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) {
+        let typingTimeout;
+        messageInput.addEventListener('input', () => {
+            if (window.wsClient?.socket?.readyState === WebSocket.OPEN && window.wsClient.currentChatUser) {
+                const typingMessage = {
+                    type: 'typing_status',
+                    content: {
+                        receiver_id: window.wsClient.currentChatUser,
+                        isTyping: true,
+                        username: localStorage.getItem('username')
+                    }
+                };
+                window.wsClient.socket.send(JSON.stringify(typingMessage));
+
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    const stopTypingMessage = {
+                        type: 'typing_status',
+                        content: {
+                            receiver_id: window.wsClient.currentChatUser,
+                            isTyping: false,
+                            username: localStorage.getItem('username')
+                        }
+                    };
+                    window.wsClient.socket.send(JSON.stringify(stopTypingMessage));
+                }, 1000);
+            }
+        });
+    }
 }
-
-
 
 // Register page content function
 function registerContent() {

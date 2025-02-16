@@ -113,6 +113,8 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		switch msg.Type {
 		case "private_message":
 			handlePrivateMessage(userID, username, msg.Content)
+			case "typing_status":
+				handleTypingStatus(userID, username, msg.Content)
 		case "ping":
 			err = safeConn.WriteJSON(Message{
 				Type: "pong",
@@ -128,7 +130,42 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+func handleTypingStatus(senderID int, senderUsername string, content interface{}) {
+    
+    contentMap, ok := content.(map[string]interface{})
+    if !ok {
+        return
+    }
 
+    receiverID, ok := contentMap["receiver_id"].(float64)
+    if !ok {
+        return
+    }
+
+    isTyping, ok := contentMap["isTyping"].(bool)
+    if !ok {
+        return
+    }
+
+    
+    clientsMutex.RLock()
+    if recipientConn, ok := clients[int(receiverID)]; ok {
+        err := recipientConn.WriteJSON(Message{
+            Type: "typing_status",
+            Content: map[string]interface{}{
+                "user_id":  senderID,
+                "username": senderUsername,
+                "isTyping": isTyping,
+            },
+        })
+        if err != nil {
+            log.Printf("[DEBUG] Error sending typing status: %v", err)
+        }
+    } else {
+        log.Printf("[DEBUG] Recipient connection not found")
+    }
+    clientsMutex.RUnlock()
+}
 // Create a safe write method
 func (sc *SafeConn) WriteJSON(v interface{}) error {
     sc.mu.Lock()

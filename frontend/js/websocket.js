@@ -22,7 +22,20 @@ import { renderComments } from './comments.js';
                     }
                 }
             });
-
+            
+            this.addMessageHandler('typing_status', (content) => {
+                const typingIndicator = document.getElementById('typingIndicator');
+                if (typingIndicator) {
+                    if (content.isTyping) {
+                        typingIndicator.style.display = 'inline-block';
+                        typingIndicator.textContent = `${content.username} is typing...`;
+                    } else {
+                        typingIndicator.style.display = 'none';
+                        typingIndicator.textContent = '';
+                    }
+                                    }
+            });
+    
         }
         connect() {
         console.log('Attempting WebSocket connection...');
@@ -39,17 +52,14 @@ import { renderComments } from './comments.js';
         };
 
         this.socket.onmessage = (event) => {
-        
             try {
                 const message = JSON.parse(event.data);
                 const handler = this.messageHandlers.get(message.type);
                 if (handler) {
                     handler(message.content);
-                } else {
-                    console.warn('No handler registered for message type:', message.type);
                 }
             } catch (error) {
-                console.error('Error parsing WebSocket message:', error);
+                console.error('Error handling WebSocket message:', error);
             }
         };
 
