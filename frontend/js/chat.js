@@ -152,29 +152,32 @@ export function updateUsersList(wsClient, users) {
         
         if (user.isOnline) {
             userElement.addEventListener('click', () => {
-                const messageHistory = document.getElementById('messageHistory');
-                if (messageHistory) {
-                    messageHistory.innerHTML = '';
-                }
-                
-                document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
-                userElement.classList.add('active');
-                
-                const selectedUserName = document.getElementById('selectedUserName');
-                if (selectedUserName) {
-                    selectedUserName.textContent = user.username;
-                }
-    
-                wsClient.currentChatUser = user.id;
-                loadMessages(wsClient, user.id);  
-                
-                const messageForm = document.getElementById('messageForm');
-                if (messageForm) {
-                    messageForm.style.display = 'flex';
-                }
-
                 window.history.pushState({}, '', '/chat');
                 renderContent('/chat');
+                
+                // Add a small delay to ensure DOM elements are ready
+                setTimeout(() => {
+                    const messageHistory = document.getElementById('messageHistory');
+                    if (messageHistory) {
+                        messageHistory.innerHTML = '';
+                    }
+                    
+                    document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
+                    userElement.classList.add('active');
+                    
+                    const selectedUserName = document.getElementById('selectedUserName');
+                    if (selectedUserName) {
+                        selectedUserName.textContent = `Chat with: ${user.username}`;
+                    }
+
+                    wsClient.currentChatUser = user.id;
+                    loadMessages(wsClient, user.id);  
+                    
+                    const messageForm = document.getElementById('messageForm');
+                    if (messageForm) {
+                        messageForm.style.display = 'flex';
+                    }
+                }, 50);
             });
         }
         usersList.appendChild(userElement);

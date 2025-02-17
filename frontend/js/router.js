@@ -252,7 +252,7 @@ function chatContent() {
     }
     document.getElementById('content').innerHTML = `
         <div class="chat-main">
-            <div id="selectedUserName" class="selected-user"></div>
+            <div id="selectedUserName" class="selected-user">Chat with: ${window.wsClient?.currentChatUser?.username || ''}</div>
             <div class="chat-messages" id="messageHistory"></div>
             <div id="typingIndicator" class="typing-indicator"></div>
             <form id="messageForm" class="chat-input">
