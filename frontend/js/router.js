@@ -355,7 +355,7 @@ function registerContent() {
                     <input type="text" id="last_name" placeholder="Last Name" required>
                 </div>
                 <div class="form-group">
-                    <input type="number" id="age" placeholder="Age" required>
+                    <input type="number" id="age" placeholder="Age" min="1" max="120" required>
                 </div>
                 <div class="form-group gender-group">
                     <label>Gender:</label>
@@ -435,7 +435,6 @@ async function logoutContent(event) {
 
     const sessionToken = localStorage.getItem('sessionToken');
 
-    // If no session token, redirect to login immediately
     if (!sessionToken) {
         window.history.pushState({}, '', '/login');
         loginContent();
@@ -451,19 +450,20 @@ async function logoutContent(event) {
         });
 
         if (response.ok) {
+            // Clear all stored items
             localStorage.removeItem('sessionToken');
+            localStorage.removeItem('username');
+            localStorage.removeItem('userId');
             updateNavigation();
             window.history.pushState({}, '', '/login');
             loginContent();
         } else {
             console.error('Logout failed with status:', response.status);
-            // Still redirect to login on failure
             window.history.pushState({}, '', '/login');
             loginContent();
         }
     } catch (error) {
         console.error('Logout failed:', error);
-        // Also redirect to login on error
         window.history.pushState({}, '', '/login');
         loginContent();
     }
@@ -475,11 +475,12 @@ async function logoutContent(event) {
 function updateNavigation() {
     const sessionToken = localStorage.getItem('sessionToken');
     const homeLink = document.querySelector('a[href="/"]');
-    const profileLink = document.querySelector('a[href="/profile"]');
+    const profileLink = document.getElementById('profileLink');
     const registerLink = document.querySelector('a[href="/register"]');
     const logoutLink = document.querySelector('a[href="/logout"]');
     const loginLink = document.querySelector('a[href="/login"]');
     const createPostLink = document.querySelector('a[href="/create_post"]');
+
     
     if (sessionToken) {
         // Get current user ID from localStorage or fetch it
@@ -494,10 +495,15 @@ function updateNavigation() {
         if (loginLink) loginLink.style.display = 'none';
         if (createPostLink) createPostLink.style.display = 'block';
     } else {
+        
         if (homeLink) homeLink.style.display = 'none';
-        if (profileLink) profileLink.style.display = 'none';
+        if (profileLink){
+            profileLink.style.display = 'none';
+        }
         if (registerLink) registerLink.style.display = 'block';
-        if (logoutLink) logoutLink.style.display = 'none';
+        if (logoutLink){
+            logoutLink.style.display = 'none';
+        } 
         if (loginLink) loginLink.style.display = 'block';
         if (createPostLink) createPostLink.style.display = 'none';
     }
@@ -527,7 +533,8 @@ function initRouter() {
 
     renderContent(window.location.pathname);
     updateNavigation();
-}function throttle(func, limit) {
+}
+function throttle(func, limit) {
     let inThrottle;
     return function(...args) {
         if (!inThrottle) {

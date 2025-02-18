@@ -41,17 +41,7 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if email already has an active session
-	var sessionCount int
-	err = database.DBInstance.DB.QueryRow(
-		"SELECT COUNT(*) FROM sessions WHERE email = ? AND expires_at > ?",
-		userEmail, time.Now(),
-	).Scan(&sessionCount)
-	if err == nil && sessionCount > 0 {
-		http.Error(w, "User is already logged in", http.StatusBadRequest)
-		return
-	}
-
+	
 	loginReq.Username = strings.TrimSpace(loginReq.Username)
 	loginReq.Password = strings.TrimSpace(loginReq.Password)
 
@@ -77,9 +67,21 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Verify password
 	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginReq.Password)) != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
+
+	// Check if email already has an active session
+	var sessionCount int
+	err = database.DBInstance.DB.QueryRow(
+		"SELECT COUNT(*) FROM sessions WHERE email = ? AND expires_at > ?",
+		userEmail, time.Now(),
+	).Scan(&sessionCount)
+	if err == nil && sessionCount > 0 {
+		http.Error(w, "User is already logged in", http.StatusBadRequest)
+		return
+	}
+
 
 	// Generate session token
 	sessionToken := uuid.New().String()
