@@ -2,9 +2,13 @@ import { renderContent } from './router.js';
 
 export async function handleCreatePost(e) {
     e.preventDefault();
-    const title = document.getElementById('title').value;
-    const content = document.getElementById('postContent').value.trim();
-    console.log(content);
+    let title = document.getElementById('title').value;
+    let content = document.getElementById('postContent').value.trim();
+
+    // Remove < and > characters from title and content
+    title = title.replace(/[<>]/g, '');
+    content = content.replace(/[<>]/g, '');
+
     const categoriesSelect = document.getElementById('categories');
     const categories = Array.from(categoriesSelect.selectedOptions).map(option => option.value);
 
