@@ -6,6 +6,9 @@ import { renderCommentSection, initializeComments } from './comments.js';
 import { handleLike } from './likes.js';
 import { loadProfileData } from './profile.js';
 import { sendPrivateMessage } from './message.js';
+import { deletePost } from './deletePost.js';
+
+window.deletePost = deletePost;
 
 // Route definitions: Map URL paths to corresponding content functions
 const routes = {
@@ -217,6 +220,7 @@ function singlePostContent() {
     fetch(`/post/${postId}`)
         .then(response => response.json())
         .then(post => {
+            const currentUsername = localStorage.getItem('username');
             document.getElementById('post-content').innerHTML = `
                 <h2>${post.title}</h2>
                 <p class="post-meta">Posted by ${post.username} on ${new Date(post.created_at).toLocaleDateString()}</p>
@@ -232,13 +236,19 @@ function singlePostContent() {
                         👎 <span class="dislikes-count">${post.dislikes}</span>
                     </button>
                 </div>
+                ${post.username === currentUsername ? `
+                    <div class="post-actions">
+                        <button class="delete-btn" onclick="deletePost(${post.id}, event)">
+                            🗑️ Delete Post
+                        </button>
+                    </div>
+                ` : ''}
             `;
             // After rendering the post, initialize the comments section
             document.getElementById('comments-section').innerHTML = renderCommentSection(postId);
             initializeComments(postId);
         });
 }
-
 function chatContent() {
     const pageLoadCount = sessionStorage.getItem('chatPageLoad');
 

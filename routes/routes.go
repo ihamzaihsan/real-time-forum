@@ -28,4 +28,6 @@ func InitRoutes() {
     http.HandleFunc("/categories", handlers.ServeCategories)
     http.HandleFunc("/profile/", handlers.ServeProfile)
     http.HandleFunc("/check-auth", handlers.CheckAuth)
+    http.HandleFunc("/delete-post", handlers.ServeDeletePost)
+
 }
