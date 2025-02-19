@@ -22,6 +22,7 @@ const routes = {
     '/profile/:id': { component: profileContent, requiresAuth: true }
 
 };
+
 function renderContent(path) {
     const isAuthenticated = checkAuth();
 
@@ -37,6 +38,7 @@ function renderContent(path) {
         return;
     }
 
+
     // Handle dynamic routes first
     const postMatch = path.match(/^\/post\/(\d+)$/);
     if (postMatch) {
@@ -48,6 +50,13 @@ function renderContent(path) {
         routes['/post/:id'].component();
         return;
     }
+
+    if (isAuthenticated &&  window.location.href.includes('?')) {
+        window.history.pushState({}, '', '/');
+        routes['/'].component();
+        return;
+    }
+    
 
     // Check if path exists in routes
     if (!routes[path]) {
@@ -61,6 +70,22 @@ function renderContent(path) {
         }
         return;
     }
+
+    if (isAuthenticated && (path === '/login' || path === '/register')) {
+        window.history.pushState({}, '', '/');
+        routes['/'].component();
+        return;
+    }
+
+
+
+
+    if (isAuthenticated && path.startsWith('?')) {
+        window.history.pushState({}, '', '/');
+        routes['/'].component();
+        return;
+    }
+    
 
     const route = routes[path];
 
@@ -138,6 +163,7 @@ function homeContent() {
             });
         });
 }
+
 function profileContent() {
     const userId = localStorage.getItem('userId');
     if (!userId) {
