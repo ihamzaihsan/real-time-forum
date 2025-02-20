@@ -21,7 +21,13 @@ func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
-	
+
+	// Validate categories
+	if len(post.Categories) == 0 {
+		http.Error(w, "At least one category is required", http.StatusBadRequest)
+		return
+	}
+
 	userID := getUserIDFromSession(r)
 	if userID == 0 {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
