@@ -60,6 +60,7 @@ export async function handleRegisterSubmit(event) {
         }
         const result = await response.json();
         localStorage.setItem('sessionToken', result.token);
+        localStorage.setItem('userId', result.user_id);
         
         // Hide the register form
         document.getElementById('registerForm').style.display = 'none';

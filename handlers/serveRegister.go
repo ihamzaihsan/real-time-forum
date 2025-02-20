@@ -71,14 +71,20 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	
+	var userId int
+	err = database.DBInstance.DB.QueryRow("SELECT id FROM users WHERE email = ?", user.Email).Scan(&userId)
+	if err != nil {
+		http.Error(w, "Error getting user ID", http.StatusInternalServerError)
+		return
+	}
 
-	// After successful registration, create session
 	sessionToken := uuid.New().String()
 
 	// Set session in database
 	_, err = database.DBInstance.DB.Exec(`
-        INSERT INTO sessions (session_token, email, expires_at) 
-        VALUES (?, ?, ?)`,
+				INSERT INTO sessions (session_token, email, expires_at) 
+				VALUES (?, ?, ?)`,
 		sessionToken, user.Email, time.Now().Add(24*time.Hour))
 
 	if err != nil {
@@ -97,11 +103,12 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 
-	// Send success response
+	// Send response with user ID
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "User registered successfully",
 		"token":   sessionToken,
+		"user_id": userId,
 	})
 }
 

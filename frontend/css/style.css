@@ -229,7 +229,7 @@ nav ul li a.active {
         padding: 20px;
         margin: 0;
         border-bottom: 1px solid #e0e0e0;
-        color: var(--text-secondary)
+        color: var(--text-primary)
     }
 
     .online-users-sidebar {
@@ -242,6 +242,7 @@ nav ul li a.active {
         padding-right: 10px;
         z-index: 2;
     }
+
     
     .online-users-sidebar::-webkit-scrollbar {
         width: 8px;

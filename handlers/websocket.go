@@ -277,15 +277,30 @@ func getUsernameFromSession(r *http.Request) string {
 }
 
 func getActiveUsers(db *sql.DB, currentUserID int) ([]map[string]interface{}, error) {
-	rows, err := db.Query(`
-        SELECT u.id, u.username, u.is_online,
-        COALESCE(MAX(m.created_at), u.created_at) as last_message_time
-        FROM users u
-        LEFT JOIN messages m ON (u.id = m.sender_id OR u.id = m.receiver_id)
-        WHERE u.id != ?
-        GROUP BY u.id
-        ORDER BY last_message_time DESC, u.username
-    `, currentUserID) // Pass the current userID as parameter
+
+    rows, err := db.Query(`
+        WITH MessageInfo AS (
+            SELECT 
+                u.id,
+                u.username,
+                u.is_online,
+                MAX(CASE 
+                    WHEN (m.sender_id = ? AND m.receiver_id = u.id) OR 
+                        (m.receiver_id = ? AND m.sender_id = u.id)
+                    THEN m.created_at 
+                END) as last_message_time
+            FROM users u
+            LEFT JOIN messages m ON (u.id = m.sender_id OR u.id = m.receiver_id)
+            WHERE u.id != ?
+            GROUP BY u.id, u.username, u.is_online
+        )
+        SELECT * FROM MessageInfo
+        ORDER BY 
+            CASE WHEN last_message_time IS NOT NULL THEN 0 ELSE 1 END,
+            last_message_time DESC NULLS LAST,
+            username ASC
+    `, currentUserID, currentUserID, currentUserID)
+
 	if err != nil {
 		return nil, err
 	}
@@ -293,21 +308,23 @@ func getActiveUsers(db *sql.DB, currentUserID int) ([]map[string]interface{}, er
 
 	var users []map[string]interface{}
 	for rows.Next() {
-		var user struct {
-			ID              int
-			Username        string
-			IsOnline        bool
-			LastMessageTime string
-		}
-		if err := rows.Scan(&user.ID, &user.Username, &user.IsOnline, &user.LastMessageTime); err != nil {
+		var (
+			id              int
+			username        string
+			isOnline       bool
+			lastMessageTime sql.NullString
+		)
+		
+		if err := rows.Scan(&id, &username, &isOnline, &lastMessageTime); err != nil {
 			log.Printf("[WARN] Skipping user due to scan error: %v", err)
 			continue
 		}
+
 		users = append(users, map[string]interface{}{
-			"id":              user.ID,
-			"username":        user.Username,
-			"isOnline":        user.IsOnline,
-			"lastMessageTime": user.LastMessageTime,
+			"id":              id,
+			"username":        username,
+			"isOnline":        isOnline,
+			"lastMessageTime": lastMessageTime.String,
 		})
 	}
 	return users, nil
