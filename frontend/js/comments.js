@@ -9,6 +9,12 @@ export async function loadComments(postId) {
     }
 }
 export async function createComment(postId, content) {
+      // Add character limit check with alert
+      if (content.length > 100) {
+        alert('Comment must be 100 characters or less');
+        return;
+    }
+
     try {
         const response = await fetch('/comment', {
             method: 'POST',

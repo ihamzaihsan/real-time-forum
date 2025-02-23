@@ -20,6 +20,12 @@ func ServeCreateComment(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    if len(comment.Content) > 100 {
+        http.Error(w, "Comment must be 100 characters or less", http.StatusBadRequest)
+        return
+    }
+
+
     // Get user ID from session
     userID := getUserIDFromSession(r)
     if userID == 0 {
