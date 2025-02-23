@@ -22,6 +22,17 @@ func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Add character limit validation
+    if len(post.Title) > 100 {
+        http.Error(w, "Title must be 100 characters or less", http.StatusBadRequest)
+        return
+    }
+
+    if len(post.Content) > 5000 {
+        http.Error(w, "Content must be 5000 characters or less", http.StatusBadRequest)
+        return
+    }
+	
 	// Validate categories
 	if len(post.Categories) == 0 {
 		http.Error(w, "At least one category is required", http.StatusBadRequest)
