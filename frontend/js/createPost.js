@@ -20,6 +20,17 @@ export async function handleCreatePost(e) {
         return;
     }
 
+    if (title.length == 0) {
+        alert('Title must be more than one character');
+        return;
+    }
+
+    if (content.length == 0) {
+        alert('Content must be more than one character');
+        return;
+    }
+
+
     const categoriesSelect = document.getElementById('categories');
     const categories = Array.from(categoriesSelect.selectedOptions).map(option => option.value);
 

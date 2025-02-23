@@ -16,13 +16,15 @@ function throttle(func, limit) {
     }
 }
 export function initializeScrollListener() {
+    
     const messageHistory = document.getElementById('messageHistory');
     const throttledLoadMore = throttle(() => {
         // Check if we're near the top of the scroll
-        if (messageHistory.scrollTop < 100) {
+        if (messageHistory.scrollTop <= 10) {
+         
             loadMoreMessages();
         }
-    }, 500); // Throttle to 500ms
+    }, 100); 
 
     messageHistory.addEventListener('scroll', throttledLoadMore);
 }
@@ -61,6 +63,8 @@ export function loadMoreMessages() {
                 
                 // Maintain scroll position
                 messageHistory.scrollTop = messageHistory.scrollHeight - oldScrollHeight;
+            }else{
+                messageHistory.removeEventListener('scroll', throttledLoadMore);  // No more messages to load
             }
         })
         .finally(() => {
