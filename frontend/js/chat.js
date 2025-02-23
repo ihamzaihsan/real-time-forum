@@ -152,7 +152,7 @@ export function loadMoreMessages() {
             }
         
             // If neither has messages, sort alphabetically
-            return a.username.localeCompare(b.username);
+            return a.username.toLowerCase().localeCompare(b.username.toLowerCase());
         });
 
         // Continue with the existing rendering code
