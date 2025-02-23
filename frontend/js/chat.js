@@ -140,26 +140,27 @@ export function loadMoreMessages() {
         messageHistory.scrollTop = messageHistory.scrollHeight;
     }
 
-    export function updateUsersList(wsClient, users) {
+
+    const throttledUpdateUsersList = throttle((wsClient, users) => {
         const usersList = document.getElementById('onlineUsers');
         if (!usersList) return;
 
-        // Sort users: first by message existence, then by time or alphabetically
+          // Sort users: first by message existence, then by time or alphabetically
         const sortedUsers = users.sort((a, b) => {
-            // If one has message and other doesn't, prioritize the one with message
+              // If one has message and other doesn't, prioritize the one with message
             if (a.lastMessageTime && !b.lastMessageTime) return -1;
             if (!a.lastMessageTime && b.lastMessageTime) return 1;
-        
-            // If both have messages, sort by time
+    
+              // If both have messages, sort by time
             if (a.lastMessageTime && b.lastMessageTime) {
                 return new Date(b.lastMessageTime) - new Date(a.lastMessageTime);
             }
-        
-            // If neither has messages, sort alphabetically
+    
+              // If neither has messages, sort alphabetically
             return a.username.toLowerCase().localeCompare(b.username.toLowerCase());
         });
 
-        // Continue with the existing rendering code
+          // Continue with the existing rendering code
         usersList.innerHTML = '';
         sortedUsers.forEach((user) => {
             const userElement = document.createElement('div');
@@ -169,29 +170,28 @@ export function loadMoreMessages() {
                 <span class="user-status"></span>
                 <span class="user-name">${user.username}</span>
             `;
-        
+    
             if (user.isOnline) {
                 userElement.addEventListener('click', () => {
                     window.history.pushState({}, '', '/chat');
                     renderContent('/chat');
-                
-                    // Add a small delay to ensure DOM elements are ready
+            
                     setTimeout(() => {
                         const messageHistory = document.getElementById('messageHistory');
                         if (messageHistory) {
                             messageHistory.innerHTML = '';
                         }
-                    
+                
                         document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
                         userElement.classList.add('active');
-                    
+                
                         const selectedUserName = document.getElementById('selectedUserName');
                         if (selectedUserName) {
                             selectedUserName.textContent = `Chat with: ${user.username}`;
                         }
                         wsClient.currentChatUser = user.id;
                         loadMessages(wsClient, user.id);  
-                    
+                
                         const messageForm = document.getElementById('messageForm');
                         if (messageForm) {
                             messageForm.style.display = 'flex';
@@ -201,4 +201,9 @@ export function loadMoreMessages() {
             }
             usersList.appendChild(userElement);
         });
+    }, 5000);
+
+    export function updateUsersList(wsClient, users) {
+        throttledUpdateUsersList(wsClient, users);
     }
+    
