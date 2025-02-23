@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +31,24 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 	if user.Username == "" || user.Email == "" || user.Password == "" {
 		http.Error(w, "Username, email, and password are required", http.StatusBadRequest)
 		log.Println(user.Password)
+		return
+	}
+
+	// Add password validation pattern
+	passwordPattern := `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$`
+	passwordRegex := regexp.MustCompile(passwordPattern)
+
+	if !passwordRegex.MatchString(user.Password) {
+		http.Error(w, "Password must be at least 8 characters long and contain uppercase, lowercase, number and special character", http.StatusBadRequest)
+		return
+	}
+
+	// Add email validation pattern
+	emailPattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+	emailRegex := regexp.MustCompile(emailPattern)
+
+	if !emailRegex.MatchString(user.Email) {
+		http.Error(w, "Invalid email format", http.StatusBadRequest)
 		return
 	}
 
@@ -71,7 +90,7 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	
+
 	var userId int
 	err = database.DBInstance.DB.QueryRow("SELECT id FROM users WHERE email = ?", user.Email).Scan(&userId)
 	if err != nil {
