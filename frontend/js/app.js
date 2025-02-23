@@ -41,16 +41,22 @@ import { loadProfileData } from './profile.js';
 
         window.wsClient = wsClient;
     });
-
+    
     function initSessionValidator() {
-        setInterval(async () => {
-            if (window.location.pathname === '/register' || window.location.pathname === '/login') {
-                return;
-            }
-            const response = await fetch('/check-auth');
-            if (!response.ok) {
-                localStorage.clear();
-                window.location.href = '/login';
-            }
-        }, 30000); 
+        // Immediate check on page load
+        checkAuthStatus();
+    
+        // Regular interval checks
+        setInterval(checkAuthStatus, 30000);
+    }
+
+    async function checkAuthStatus() {
+        if (window.location.pathname === '/register' || window.location.pathname === '/login') {
+            return;
+        }
+        const response = await fetch('/check-auth');
+        if (!response.ok) {
+            localStorage.clear();
+            window.location.href = '/login';
+        }
     }
