@@ -27,9 +27,9 @@ export async function handleRegisterSubmit(event) {
     if (!emailPattern.test(userData.email)) {
         errors.push('Invalid email format.');
     }
-    if (!passwordPattern.test(userData.password)) {
-        errors.push('Password must be at least 8 characters long, include one uppercase letter, one lowercase letter, and one special character.');
-    }
+    // if (!passwordPattern.test(userData.password)) {
+    //     errors.push('Password must be at least 8 characters long, include one uppercase letter, one lowercase letter, and one special character.');
+    // }
     if (isNaN(userData.age) || userData.age <= 0) {
         errors.push('Age must be a positive number.');
     }

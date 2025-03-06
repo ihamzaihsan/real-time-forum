@@ -32,13 +32,13 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	passwordPattern := `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$`
-	passwordRegex := regexp.MustCompile(passwordPattern)
+	// passwordPattern := `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$`
+	// passwordRegex := regexp.MustCompile(passwordPattern)
 
-	if !passwordRegex.MatchString(user.Password) {
-		http.Error(w, "Password must be at least 8 characters long and contain uppercase, lowercase, number and special character", http.StatusBadRequest)
-		return
-	}
+	// if !passwordRegex.MatchString(user.Password) {
+	// 	http.Error(w, "Password must be at least 8 characters long and contain uppercase, lowercase, number and special character", http.StatusBadRequest)
+	// 	return
+	// }
 
 	emailPattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
 	emailRegex := regexp.MustCompile(emailPattern)
