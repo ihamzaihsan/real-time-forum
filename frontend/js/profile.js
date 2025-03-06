@@ -13,11 +13,11 @@ export async function loadProfileData(userId) {
 
         const profileData = await response.json();
         
-        // Set avatar initials
+        
         const initials = `${profileData.first_name[0]}${profileData.last_name[0]}`.toUpperCase();
         document.getElementById('profileAvatar').textContent = initials;
         
-        // Set profile information
+        
         document.getElementById('fullName').textContent = 
             `${profileData.first_name} ${profileData.last_name}`;
         document.getElementById('username').textContent = profileData.username;

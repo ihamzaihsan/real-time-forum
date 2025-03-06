@@ -19,7 +19,6 @@ func ServeCommentLike(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Get user ID from session
     var userID int
     err := database.DBInstance.DB.QueryRow(
         "SELECT u.id FROM users u JOIN sessions s ON u.email = s.email WHERE s.session_token = ?",

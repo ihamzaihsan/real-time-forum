@@ -15,12 +15,12 @@ export async function handleRegisterSubmit(event) {
         gender: document.querySelector('input[name="gender"]:checked').value
     };
 
-    // Validation patterns
+    
     const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\W).{8,}$/; // At least 8 chars, one upper, one lower, one special
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\W).{8,}$/;
     const errors = [];
 
-    // Validation logic
+    
     if (!userData.username) {
         errors.push('Username is required.');
     }
@@ -37,13 +37,13 @@ export async function handleRegisterSubmit(event) {
         errors.push('Gender is required.');
     }
 
-    // In handleRegisterSubmit, replace the errors alert with:
+    
     if (errors.length > 0) {
         displayErrors(errors);
         return;
     }
 
-    // Proceed with submission if validation passes
+
     try {
         const response = await fetch('/register', {
             method: 'POST',
@@ -62,7 +62,6 @@ export async function handleRegisterSubmit(event) {
         localStorage.setItem('sessionToken', result.token);
         localStorage.setItem('userId', result.user_id);
         
-        // Hide the register form
         document.getElementById('registerForm').style.display = 'none';
         
     

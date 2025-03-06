@@ -10,7 +10,6 @@ import { deletePost } from './deletePost.js';
 
 window.deletePost = deletePost;
 
-// Route definitions: Map URL paths to corresponding content functions
 const routes = {
     '/': { component: homeContent, requiresAuth: true },
     '/register': { component: registerContent, requiresAuth: false },
@@ -26,7 +25,6 @@ const routes = {
 function renderContent(path) {
     const isAuthenticated = checkAuth();
 
-    // Handle profile route
     const profileMatch = path.match(/^\/profile\/(\d+)$/);
     if (profileMatch) {
         if (!isAuthenticated) {
@@ -38,8 +36,6 @@ function renderContent(path) {
         return;
     }
 
-
-    // Handle dynamic routes first
     const postMatch = path.match(/^\/post\/(\d+)$/);
     if (postMatch) {
         if (!isAuthenticated) {
@@ -58,9 +54,7 @@ function renderContent(path) {
     }
     
 
-    // Check if path exists in routes
     if (!routes[path]) {
-        // Invalid path - redirect based on auth status
         if (isAuthenticated) {
             window.history.pushState({}, '', '/');
             routes['/'].component();
@@ -96,21 +90,17 @@ function renderContent(path) {
     }
 
     if (!isAuthenticated && route.requiresAuth) {
-        // Redirect to login if trying to access protected route
         window.history.pushState({}, '', '/login');
         routes['/login'].component();
         return;
     }
 
     if (isAuthenticated && path === '/') {
-        // If logged in and accessing root, show home
         route.component();
     } else if (!isAuthenticated && path !== '/login' && path !== '/register') {
-        // If not logged in and not trying to access login/register, redirect to login
         window.history.pushState({}, '', '/login');
         routes['/login'].component();
     } else {
-        // Normal route handling
         route.component();
     }
 
@@ -151,7 +141,6 @@ function homeContent() {
                 postsContainer.appendChild(postWrapper);
             });
 
-            // Add click event listeners after adding posts
             const postCards = document.querySelectorAll('.post-card');
             postCards.forEach(card => {
                 card.addEventListener('click', (e) => {
@@ -171,11 +160,9 @@ function profileContent() {
         loginContent();
         return;
     }
-
-    // Get the main container
     const mainContainer = document.querySelector('.main-container');
     
-    // Set the content
+
     document.getElementById('content').innerHTML = `
         <div class="profile-container">
             <div class="profile-header">
@@ -207,7 +194,6 @@ function profileContent() {
 
 
 async function createPostContent() {
-    // Fetch categories from backend
     const response = await fetch('/categories');
     const categories = await response.json();
     
@@ -270,7 +256,6 @@ function singlePostContent() {
                     </div>
                 ` : ''}
             `;
-            // After rendering the post, initialize the comments section
             document.getElementById('comments-section').innerHTML = renderCommentSection(postId);
             initializeComments(postId);
         });
@@ -300,7 +285,6 @@ function chatContent() {
     initializeScrollListener();
     
 
-    // Initialize message form handler
     const messageForm = document.getElementById('messageForm');
     if (messageForm) {
         messageForm.addEventListener('submit', (e) => {
@@ -315,7 +299,7 @@ function chatContent() {
                     return;
                 }
                 
-                // Add message to UI immediately
+            
                 const messageHistory = document.getElementById('messageHistory');
                 const messageElement = document.createElement('div');
                 messageElement.className = 'message sent';
@@ -331,7 +315,6 @@ function chatContent() {
         });
     }
 
-    // Reconnect WebSocket when entering chat
     if (window.wsClient) {
         window.wsClient.connect();
     }
@@ -368,7 +351,6 @@ function chatContent() {
     }
 }
 
-// Register page content function
 function registerContent() {
     document.body.className = 'login-page';
     document.getElementById('content').innerHTML = `
@@ -449,21 +431,19 @@ function loginContent() {
     `;
 
     document.getElementById('loginForm').addEventListener('submit', handleLoginSubmit);
-}// Handle navigation when a link is clicked
+}
 function handleRoute(event) {
     event.preventDefault();
     const path = event.target.getAttribute('href');
     window.history.pushState({}, '', path);
     renderContent(path);
     
-    // Initialize WebSocket connection when navigating to chat
     if (path === '/chat' && window.wsClient) {
         window.wsClient.connect();
 
     }
 }
 
-// Logout content function
 async function logoutContent(event) {
     if (event) {
         event.preventDefault();
@@ -486,7 +466,6 @@ async function logoutContent(event) {
         });
 
         if (response.ok) {
-            // Clear all stored items
             localStorage.removeItem('sessionToken');
             localStorage.removeItem('username');
             localStorage.removeItem('userId');
@@ -506,8 +485,6 @@ async function logoutContent(event) {
 }
 
 
-
-// Update navigation links visibility based on login state
 function updateNavigation() {
     const sessionToken = localStorage.getItem('sessionToken');
     const homeLink = document.querySelector('a[href="/"]');
@@ -519,7 +496,6 @@ function updateNavigation() {
 
     
     if (sessionToken) {
-        // Get current user ID from localStorage or fetch it
         const userId = localStorage.getItem('userId');
         if (homeLink) homeLink.style.display = 'block';
         if (profileLink) {
@@ -544,7 +520,6 @@ function updateNavigation() {
         if (createPostLink) createPostLink.style.display = 'none';
     }
 }
-// Initialize router: Set up event listeners for navigation links
 function initRouter() {
     document.querySelectorAll('a').forEach(link => {
         const path = link.getAttribute('href');
@@ -580,18 +555,15 @@ function throttle(func, limit) {
         }
     }
 }
-// Display errors for form validation
 function displayErrors(errors) {
     const form = document.querySelector('form');
-    if (!form) return; // Exit if no form is found
+    if (!form) return;
     
-    // Remove any existing error messages
     const existingErrors = document.querySelector('.error-messages');
     if (existingErrors) {
         existingErrors.remove();
     }
 
-    // Create and insert new error messages
     const errorDiv = document.createElement('div');
     errorDiv.className = 'error-messages';
     errorDiv.innerHTML = errors.map(error => `<p>${error}</p>`).join('');

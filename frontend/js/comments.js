@@ -9,7 +9,7 @@ export async function loadComments(postId) {
     }
 }
 export async function createComment(postId, content) {
-      // Add character limit check with alert
+      
       if (content.length > 100) {
         alert('Comment must be 100 characters or less');
         return;
@@ -58,11 +58,11 @@ export function initializeComments(postId) {
     const commentForm = document.getElementById('commentForm');
     const commentsList = document.getElementById('commentsList');
 
-    // Load existing comments first
+    
     loadComments(postId).then(comments => {
         renderComments(comments);
 
-        // Then set up the form handler
+        
         commentForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const content = document.getElementById('commentContent').value.trim();
@@ -70,7 +70,7 @@ export function initializeComments(postId) {
 
             try {
                 const newComment = await createComment(postId, content);
-                // Get current comments and add new one
+                
                 const currentComments = await loadComments(postId);
                 renderComments(currentComments);
                 document.getElementById('commentContent').value = '';

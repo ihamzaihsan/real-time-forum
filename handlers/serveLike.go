@@ -19,7 +19,6 @@ func ServeLike(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Get user ID from session
     var userID int
     err := database.DBInstance.DB.QueryRow(
         "SELECT u.id FROM users u JOIN sessions s ON u.email = s.email WHERE s.session_token = ?",
@@ -30,7 +29,6 @@ func ServeLike(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Parse post ID and like status
     postID, err := strconv.Atoi(r.FormValue("post_id"))
     if err != nil {
         http.Error(w, "Invalid post ID", http.StatusBadRequest)
@@ -43,7 +41,6 @@ func ServeLike(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Check if user already liked/disliked
     var existingIsLike bool
     err = database.DBInstance.DB.QueryRow(
         "SELECT is_like FROM likes WHERE user_id = ? AND post_id = ?",
@@ -51,13 +48,11 @@ func ServeLike(w http.ResponseWriter, r *http.Request) {
     ).Scan(&existingIsLike)
 
     if err == nil {
-        // Update existing like/dislike
         _, err = database.DBInstance.DB.Exec(
             "UPDATE likes SET is_like = ? WHERE user_id = ? AND post_id = ?",
             isLike, userID, postID,
         )
     } else {
-        // Insert new like/dislike
         _, err = database.DBInstance.DB.Exec(
             "INSERT INTO likes (user_id, post_id, is_like) VALUES (?, ?, ?)",
             userID, postID, isLike,
@@ -69,7 +64,6 @@ func ServeLike(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Get updated counts
     var likesCount, dislikesCount int
     err = database.DBInstance.DB.QueryRow(
         "SELECT COUNT(*) FROM likes WHERE post_id = ? AND is_like = true", postID,

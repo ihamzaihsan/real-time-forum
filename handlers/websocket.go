@@ -22,19 +22,15 @@ type Message struct {
 	Content interface{} `json:"content"`
 }
 
-// Add a connection write mutex for each client
 type SafeConn struct {
     conn *websocket.Conn
     mu   sync.Mutex
 }
 
-// Update the clients map to use SafeConn
 var clients = make(map[int]*SafeConn)
 var clientsMutex sync.RWMutex
 
-// HandleWebSocket handles the WebSocket connections
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	// Get token from query parameter
 	sessionToken := r.URL.Query().Get("token")
 	if sessionToken == "" {
 		log.Println("[ERROR] Missing session token")
@@ -52,7 +48,6 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
         conn: conn,
     }
 
-	// Set the Authorization header with the token
 	r.Header.Set("Authorization", sessionToken)
 
 	userID := getUserIDFromSession(r)
@@ -74,13 +69,11 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	clientsMutex.Unlock()
 
 
-	// Update user status to online
 	_, err = database.DBInstance.DB.Exec(
 		"UPDATE users SET is_online = TRUE WHERE id = ?",
 		userID,
 	)
 
-	// Start goroutine for broadcasting user list updates
 	go broadcastActiveUsers()
 
 	defer func() {
@@ -88,7 +81,6 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		delete(clients, userID)
 		clientsMutex.Unlock()
 		
-		// Update user status to offline in database
 		_, err := database.DBInstance.DB.Exec(
 			"UPDATE users SET is_online = FALSE WHERE id = ?",
 			userID,
@@ -97,7 +89,6 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[ERROR] Failed to update offline status: %v", err)
 		}
 		
-		// Broadcast updated user list to all clients
 		go broadcastActiveUsers()
 		
 		conn.Close()
@@ -166,20 +157,17 @@ func handleTypingStatus(senderID int, senderUsername string, content interface{}
     }
     clientsMutex.RUnlock()
 }
-// Create a safe write method
 func (sc *SafeConn) WriteJSON(v interface{}) error {
     sc.mu.Lock()
     defer sc.mu.Unlock()
     return sc.conn.WriteJSON(v)
 }
 
-// Periodically sends the user list to each connected client.
 func broadcastActiveUsers() {
     for {
-        // Get current userID from the clients map
         clientsMutex.RLock()
         for userID := range clients {
-            // Get active users excluding current user
+            
             users, err := getActiveUsers(database.DBInstance.DB, userID)
             if err != nil {
                 log.Printf("[ERROR] Failed to fetch active users: %v", err)
@@ -189,7 +177,7 @@ func broadcastActiveUsers() {
                 Type:    "users_list",
                 Content: users,
             }
-            // Send the filtered list to this specific client
+           
             if client, ok := clients[userID]; ok {
                 err := client.WriteJSON(message)
                 if err != nil {

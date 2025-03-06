@@ -22,7 +22,6 @@ func CheckAuth(w http.ResponseWriter, r *http.Request) {
 	).Scan(&expiresAt)
 
 	if err != nil || time.Now().After(expiresAt) {
-		// Clean up expired session
 		database.DBInstance.DB.Exec("DELETE FROM sessions WHERE session_token = ?", cookie.Value)
 		http.Error(w, "Session expired", http.StatusUnauthorized)
 		return

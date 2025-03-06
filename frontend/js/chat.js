@@ -1,6 +1,6 @@
 import { WebSocketClient } from './websocket.js';
 import { renderContent } from './router.js';
- // Add this variable to track if we're currently loading messages
+
     let isLoadingMessages = false;
 
 function throttle(func, limit) {
@@ -19,7 +19,7 @@ export function initializeScrollListener() {
     
     const messageHistory = document.getElementById('messageHistory');
     const throttledLoadMore = throttle(() => {
-        // Check if we're near the top of the scroll
+       
         if (messageHistory.scrollTop <= 10) {
          
             loadMoreMessages();
@@ -61,10 +61,10 @@ export function loadMoreMessages() {
                     messageHistory.innerHTML = messageElement + messageHistory.innerHTML;
                 });
                 
-                // Maintain scroll position
+                
                 messageHistory.scrollTop = messageHistory.scrollHeight - oldScrollHeight;
             }else{
-                messageHistory.removeEventListener('scroll', throttledLoadMore);  // No more messages to load
+                messageHistory.removeEventListener('scroll', throttledLoadMore);  
             }
         })
         .finally(() => {
@@ -86,7 +86,7 @@ export function loadMoreMessages() {
         .catch((error) => console.error('Error loading messages:', error));
     }
 
-    // Add this separate function to handle loading more messages
+    
     export function handleLoadMore(userId) {
         const messageHistory = document.getElementById('messageHistory');
         const currentOffset = document.querySelectorAll('.message').length;
@@ -145,22 +145,19 @@ export function loadMoreMessages() {
         const usersList = document.getElementById('onlineUsers');
         if (!usersList) return;
 
-          // Sort users: first by message existence, then by time or alphabetically
         const sortedUsers = users.sort((a, b) => {
-              // If one has message and other doesn't, prioritize the one with message
+              
             if (a.lastMessageTime && !b.lastMessageTime) return -1;
             if (!a.lastMessageTime && b.lastMessageTime) return 1;
     
-              // If both have messages, sort by time
+             
             if (a.lastMessageTime && b.lastMessageTime) {
                 return new Date(b.lastMessageTime) - new Date(a.lastMessageTime);
             }
-    
-              // If neither has messages, sort alphabetically
             return a.username.toLowerCase().localeCompare(b.username.toLowerCase());
         });
 
-          // Continue with the existing rendering code
+    
         usersList.innerHTML = '';
         sortedUsers.forEach((user) => {
             const userElement = document.createElement('div');

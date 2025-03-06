@@ -12,7 +12,7 @@ export function handleLike(postId, isLike) {
     })
     .then(response => response.json())
     .then(data => {
-        // Update all instances of this post's like counts
+        
         const postElements = document.querySelectorAll(`[data-post-id="${postId}"]`);
         postElements.forEach(element => {
             const likesCount = element.querySelector('.likes-count');
@@ -21,7 +21,7 @@ export function handleLike(postId, isLike) {
             if (dislikesCount) dislikesCount.textContent = data.dislikes;
         });
 
-        // If we're on the single post view, also update the main post content
+        
         const postContent = document.getElementById('post-content');
         if (postContent) {
             const likesCount = postContent.querySelector('.likes-count');

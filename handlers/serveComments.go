@@ -25,8 +25,6 @@ func ServeCreateComment(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-
-    // Get user ID from session
     userID := getUserIDFromSession(r)
     if userID == 0 {
         http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -36,7 +34,6 @@ func ServeCreateComment(w http.ResponseWriter, r *http.Request) {
     comment.UserID = userID
     comment.CreatedAt = time.Now()
 
-    // Insert comment into database
     result, err := database.DBInstance.DB.Exec(
         "INSERT INTO comments (content, user_id, post_id, created_at) VALUES (?, ?, ?, ?)",
         comment.Content, comment.UserID, comment.PostID, comment.CreatedAt,
@@ -49,7 +46,6 @@ func ServeCreateComment(w http.ResponseWriter, r *http.Request) {
     commentID, _ := result.LastInsertId()
     comment.ID = int(commentID)
 
-    // Broadcast new comment to WebSocket clients
     broadcastComment(comment)
 
     w.Header().Set("Content-Type", "application/json")
@@ -112,7 +108,6 @@ func broadcastComment(comment models.Comment) {
         Content: comment,
     }
     
-    // Broadcast to all connected clients
     clientsMutex.RLock()
     for _, client := range clients {
         client.mu.Lock()

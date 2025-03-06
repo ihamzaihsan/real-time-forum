@@ -1,5 +1,3 @@
-// frontend/js/post.js
-
 document.getElementById('createPostForm').addEventListener('submit', async (event) => {
     event.preventDefault();
 

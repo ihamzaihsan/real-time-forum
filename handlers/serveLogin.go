@@ -24,13 +24,11 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 
-	// Decode and validate input
 	if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {
 		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
 
-	// Check if user exists and get their email
 	var userEmail string
 	err := database.DBInstance.DB.QueryRow(
 		"SELECT email FROM users WHERE username = ? OR email = ?",
@@ -50,7 +48,6 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Query user from database
 	var user struct {
 		ID       int
 		Password string
@@ -65,13 +62,11 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify password
 	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginReq.Password)) != nil {
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
-	// Check if email already has an active session
 	var sessionCount int
 	err = database.DBInstance.DB.QueryRow(
 		"SELECT COUNT(*) FROM sessions WHERE email = ? AND expires_at > ?",
@@ -83,10 +78,8 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 
-	// Generate session token
 	sessionToken := uuid.New().String()
 
-	// Store session in database
 	_, err = database.DBInstance.DB.Exec(`
 		INSERT INTO sessions (session_token, email, expires_at) 
 		VALUES (?, ?, ?)`,
@@ -97,7 +90,6 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update user's online status
 	_, err = database.DBInstance.DB.Exec(`
 		UPDATE users 
 		SET is_online = TRUE, last_seen = CURRENT_TIMESTAMP 
@@ -107,18 +99,16 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to update online status: %v", err)
 	}
 
-	// Set secure cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
 		Value:    sessionToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false, // Set `true` in production with HTTPS
+		Secure:   false,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 
-	// Send success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Login successful",

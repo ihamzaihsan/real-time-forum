@@ -15,7 +15,6 @@ func ServeMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract user ID from URL path
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 3 {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -28,23 +27,19 @@ func ServeMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get pagination parameters
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit == 0 {
-		limit = 10 // Default limit
+		limit = 10
 	}
 
-	// Get current user ID from session
 	currentUserId := getUserIDFromSession(r)
 	if currentUserId == 0 {
-		// Add logging to track the session token
 		log.Printf("Session token: %s", r.Header.Get("Authorization"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Query messages between users
 	rows, err := database.DBInstance.DB.Query(`
         SELECT id, sender_id, receiver_id, content, created_at, is_read 
         FROM messages 
@@ -85,7 +80,6 @@ func ServeMessages(w http.ResponseWriter, r *http.Request) {
 		messages = append(messages, msg)
 	}
 
-	// Mark messages as read
 	_, err = database.DBInstance.DB.Exec(`
         UPDATE messages 
         SET is_read = TRUE 

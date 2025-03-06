@@ -7,12 +7,11 @@ import (
 )
 
 func InitRoutes() {
-    // Serve index.html for all routes (client-side routing)
     http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
         http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
     })
 
-    // API routes
+
     http.HandleFunc("/register", handlers.ServeRegister)
     http.HandleFunc("/ws", handlers.HandleWebSocket)
     http.HandleFunc("/logout", handlers.ServeLogout)

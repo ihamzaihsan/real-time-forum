@@ -12,7 +12,6 @@ import { renderComments } from './comments.js';
             this.currentChatUser = null;
             this.onlineUsers = new Map();
 
-            // Add this to your WebSocketClient class constructor
             this.addMessageHandler('new_comment', (content) => {
                 const commentsList = document.getElementById('commentsList');
                 if (commentsList) {
@@ -65,7 +64,6 @@ import { renderComments } from './comments.js';
 
         this.socket.onclose = (event) => {
             console.warn('WebSocket connection closed:', event.reason || 'Unknown reason');
-            // Attempt reconnect if the closure was not clean
             if (event.code !== 1000) {
                 setTimeout(() => this.connect(), 5000);
             }

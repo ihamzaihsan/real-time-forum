@@ -23,7 +23,6 @@ func ServeDeletePost(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Verify post ownership
     var postOwnerID int
     err := database.DBInstance.DB.QueryRow(
         "SELECT user_id FROM posts WHERE id = ?", postID).Scan(&postOwnerID)
@@ -37,7 +36,6 @@ func ServeDeletePost(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Delete the post
     _, err = database.DBInstance.DB.Exec("DELETE FROM posts WHERE id = ?", postID)
     if err != nil {
         http.Error(w, "Database error", http.StatusInternalServerError)

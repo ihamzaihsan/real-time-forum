@@ -1,13 +1,9 @@
-// app.js
-
-// Import the router logic from router.js
 import { initRouter } from './router.js';
 import { WebSocketClient } from './websocket.js';
 import { initMessageHandlers } from './message.js';
 import { initNotifications } from './notifications.js';
 import { loadProfileData } from './profile.js';
 
-  // Initialize the router when the DOM content is loaded
     document.addEventListener('DOMContentLoaded', () => {
         const wsClient = new WebSocketClient();
         initRouter();
@@ -16,7 +12,6 @@ import { loadProfileData } from './profile.js';
         initSessionValidator();
         wsClient.connect(); 
         
-        // Create navigation if it doesn't exist
         let nav = document.querySelector('nav');
         if (!nav) {
             nav = document.createElement('nav');
@@ -43,10 +38,9 @@ import { loadProfileData } from './profile.js';
     });
     
     function initSessionValidator() {
-        // Immediate check on page load
+        
         checkAuthStatus();
     
-        // Regular interval checks
         setInterval(checkAuthStatus, 30000);
     }
 

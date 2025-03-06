@@ -30,10 +30,10 @@ export function showWindowNotification(content) {
 }
 
 export function showNotification(message) {
-    // Check if browser supports notifications
+    
     if (!("Notification" in window)) return;
 
-    // Request permission if needed
+    
     if (Notification.permission !== "granted") {
         Notification.requestPermission();
     }
@@ -41,10 +41,10 @@ export function showNotification(message) {
     if (Notification.permission === "granted") {
         const notification = new Notification("New Message", {
             body: `${message.sender_name}: ${message.message}`,
-            icon: "/path/to/icon.png"  // if we want to add icon to the notification
+            icon: "/path/to/icon.png"  
         });
 
-        // Click notification to open chat
+        
         notification.onclick = () => {
             window.focus();
             window.history.pushState({}, '', '/chat');

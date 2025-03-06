@@ -3,7 +3,7 @@ import { updateUsersList } from './chat.js';
 import { renderContent } from './router.js';
 export function initMessageHandlers(wsClient) {
     wsClient.addMessageHandler('users_list', (content) => {
-        // Populate the onlineUsers Map
+        
         content.forEach(user => {
             wsClient.onlineUsers.set(user.id, user.isOnline);
         });
@@ -13,7 +13,7 @@ export function initMessageHandlers(wsClient) {
 
     wsClient.addMessageHandler('private_message', (content) => {
         const messageContainer = document.getElementById('messageHistory');
-        // Only display message if it's from the current chat user
+        
         if (wsClient.currentChatUser && 
             messageContainer && 
             (Number(content.sender_id) === wsClient.currentChatUser ||  Number(content.sender_id) === parseInt(localStorage.getItem('userId')))) {
@@ -33,7 +33,7 @@ export function initMessageHandlers(wsClient) {
             messageContainer.scrollTop = messageContainer.scrollHeight;
         }
         
-        // Show notification for messages from other users when not in their chat
+        
         if (!window.location.pathname.includes('/chat') || 
             Number(content.sender_id) !== wsClient.currentChatUser) {
             const badge = document.getElementById('message-badge');

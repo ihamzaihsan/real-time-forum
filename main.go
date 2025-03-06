@@ -8,7 +8,6 @@ import (
 	"net/http"
 )
 
-// Serve the static files (HTML, CSS, JS)
 func serveStaticFiles() {
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("./frontend/css"))))
 	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("./frontend/js"))))

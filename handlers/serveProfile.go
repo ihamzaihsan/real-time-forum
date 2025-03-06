@@ -9,7 +9,6 @@ import (
 )
 
 func ServeProfile(w http.ResponseWriter, r *http.Request) {
-	// Check if this is a browser page request
 	acceptHeader := r.Header.Get("Accept")
 	isBrowserRequest := strings.Contains(acceptHeader, "text/html")
 
@@ -18,7 +17,7 @@ func ServeProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Continue with API response for profile data
+
 	userID := strings.TrimPrefix(r.URL.Path, "/profile/")
 	var profile models.UserProfile
 	err := database.DBInstance.DB.QueryRow(

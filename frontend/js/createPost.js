@@ -5,11 +5,11 @@ export async function handleCreatePost(e) {
     let title = document.getElementById('title').value.trim();
     let content = document.getElementById('postContent').value.trim();
 
-    // Remove < and > characters from title and content
+    
     title = title.replace(/[<>]/g, '');
     content = content.replace(/[<>]/g, '');
 
-     // Add character limit validation
+     
      if (title.length > 100) {
         alert('Title must be 100 characters or less');
         return;
@@ -34,7 +34,7 @@ export async function handleCreatePost(e) {
     const categoriesSelect = document.getElementById('categories');
     const categories = Array.from(categoriesSelect.selectedOptions).map(option => option.value);
 
-    // Validate categories
+    
     if (categories.length === 0) {
         alert('Please select at least one category');
         return;
