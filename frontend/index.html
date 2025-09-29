@@ -3,32 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>real time forum</title>
+    <meta name="theme-color" content="#f6f5f1">
+    <meta name="description" content="Yaplane — a little space for big ideas. Share perspectives, discover conversations, and connect in real time.">
+    <title>Yaplane — A little space for big ideas</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <nav>
-        <ul>
-            <li><a href="/">Home</a></li>
-            <li><a href="/register" class="nav-hidden">Register</a></li>
-            <li><a href="/profile" id="profileLink">Profile</a></li>
-            <li><a href="/create_post">Create Post</a></li>
-            <li><a href="/login" class="nav-hidden">Login</a></li>
-            <li><a href="/logout" class="nav-hidden">Logout</a></li>
-        </ul>
-    </nav>
-
-    <div id="notification-container" class="notification-container"></div>
-
-    <div class="main-container">
-        <div id="content">
-        </div>
-        <div class="online-users-sidebar">
-            <h3>Users</h3>
-            <div class="users-list" id="onlineUsers"></div>
-        </div>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+        <a href="/" data-route class="brand" aria-label="Yaplane home"><span class="brand-mark" aria-hidden="true">y<span>•</span></span>yaplane<span class="brand-period">.</span></a>
+        <label class="header-search" for="globalSearch"><span data-icon="search"></span><input id="globalSearch" type="search" placeholder="Find a conversation…" autocomplete="off"><kbd>/</kbd></label>
+        <div class="header-controls"><div class="header-actions"><span id="connectionStatus" class="connection-status" role="status">Connecting</span><a href="/create_post" data-route class="button button-dark header-create"><span data-icon="plus"></span> New discussion</a><a href="/profile" data-route id="headerProfile" class="avatar" aria-label="Your profile">Y</a></div></div>
+    </header>
+    <div class="app-layout">
+        <aside class="left-sidebar" aria-label="Community navigation">
+            <div class="workspace-label"><span class="workspace-icon" data-icon="layers"></span><div>The common room<small>Your everyday community</small></div></div>
+            <nav aria-label="Main navigation">
+                <a href="/" data-route><span data-icon="home"></span> Discussions <span class="nav-arrow">↗</span></a>
+                <a href="/chat" data-route><span data-icon="chat"></span> Messages <span id="message-badge" class="badge" hidden>0</span></a>
+                <a href="/profile" data-route id="profileLink"><span data-icon="user"></span> My profile</a>
+                <a href="/create_post" data-route><span data-icon="edit"></span> Start a discussion</a>
+            </nav>
+            <div class="sidebar-section-label">EXPLORE TOPICS <span>↙</span></div>
+            <div id="topicNavigation" class="topic-navigation"><p class="muted">Loading topics…</p></div>
+            <div class="sidebar-note"><span class="tiny-star" aria-hidden="true">✳</span><p>Good conversations<br>start with curiosity.</p><span>Bring yours.</span></div>
+            <div class="sidebar-footer"><a href="/logout" data-route><span data-icon="logout"></span> Sign out</a><span>A space to be yourself.</span></div>
+        </aside>
+        <main id="content" tabindex="-1"></main>
+        <aside class="right-sidebar">
+            <section class="members-panel"><div class="panel-heading"><h2>People, not profiles.</h2><span class="live-dot" aria-hidden="true"></span></div><p class="panel-subtitle">A conversation is just a hello away.</p><div id="onlineUsers" class="users-list" aria-live="polite"><p class="muted">Connecting to the community…</p></div><div class="member-legend"><span class="live-dot"></span> Here now <span class="offline-dot"></span> Away</div></section>
+            <section class="community-note"><span class="eyebrow">OUR LITTLE CORNER</span><h2>Different minds.<br>Common ground.</h2><p>Share what you know. Ask what you don’t. Make someone’s day a little more interesting.</p><div class="note-footer"><span>Stay curious. Stay kind.</span><span aria-hidden="true">↗</span></div></section>
+            <div class="right-footer">Made for meaningful exchanges.<br><span>Yaplane · Real-time forum</span></div>
+        </aside>
     </div>
-
-    <script type="module" src="js/app.js"></script>
+    <div id="notification-container" class="notification-container" aria-live="polite"></div>
+    <script type="module" src="/js/app.js"></script>
 </body>
 </html>
