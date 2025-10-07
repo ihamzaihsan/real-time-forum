@@ -1,580 +1,235 @@
 import { handleRegisterSubmit } from './register.js';
 import { handleLoginSubmit } from './login.js';
 import { handleCreatePost } from './createPost.js';
-import { initializeScrollListener } from './chat.js';
 import { renderCommentSection, initializeComments } from './comments.js';
 import { handleLike } from './likes.js';
 import { loadProfileData } from './profile.js';
-import { sendPrivateMessage } from './message.js';
 import { deletePost } from './deletePost.js';
+import { initializeChat, updateUsersList } from './chat.js';
+import { api, icon, escapeHTML as esc, initials, dateLabel, emptyState, showToast } from './ui.js';
 
-window.deletePost = deletePost;
+let activeTopic = '';
+let searchQuery = '';
+let sortOrder = 'newest';
+let feed = [];
+let renderVersion = 0;
 
-const routes = {
-    '/': { component: homeContent, requiresAuth: true },
-    '/register': { component: registerContent, requiresAuth: false },
-    '/logout': { component: logoutContent, requiresAuth: true },
-    '/login': { component: loginContent, requiresAuth: false },
-    '/chat': { component: chatContent, requiresAuth: true },
-    '/post/:id': { component: singlePostContent, requiresAuth: true  },
-    '/create_post': { component: createPostContent, requiresAuth: true },
-    '/profile/:id': { component: profileContent, requiresAuth: true }
-
-};
-
-function renderContent(path) {
-    const isAuthenticated = checkAuth();
-
-    const profileMatch = path.match(/^\/profile\/(\d+)$/);
-    if (profileMatch) {
-        if (!isAuthenticated) {
-            window.history.pushState({}, '', '/login');
-            routes['/login'].component();
-            return;
-        }
-        profileContent();
-        return;
-    }
-
-    const postMatch = path.match(/^\/post\/(\d+)$/);
-    if (postMatch) {
-        if (!isAuthenticated) {
-            window.history.pushState({}, '', '/login');
-            routes['/login'].component();
-            return;
-        }
-        routes['/post/:id'].component();
-        return;
-    }
-
-    if (isAuthenticated &&  window.location.href.includes('?')) {
-        window.history.pushState({}, '', '/');
-        routes['/'].component();
-        return;
-    }
-    
-
-    if (!routes[path]) {
-        if (isAuthenticated) {
-            window.history.pushState({}, '', '/');
-            routes['/'].component();
-        } else {
-            window.history.pushState({}, '', '/login');
-            routes['/login'].component();
-        }
-        return;
-    }
-
-    if (isAuthenticated && (path === '/login' || path === '/register')) {
-        window.history.pushState({}, '', '/');
-        routes['/'].component();
-        return;
-    }
-
-
-
-
-    if (isAuthenticated && path.startsWith('?')) {
-        window.history.pushState({}, '', '/');
-        routes['/'].component();
-        return;
-    }
-    
-
-    const route = routes[path];
-
-    if (path === '/logout') {
-        window.history.pushState({}, '', '/login');
-        loginContent();
-        return;
-    }
-
-    if (!isAuthenticated && route.requiresAuth) {
-        window.history.pushState({}, '', '/login');
-        routes['/login'].component();
-        return;
-    }
-
-    if (isAuthenticated && path === '/') {
-        route.component();
-    } else if (!isAuthenticated && path !== '/login' && path !== '/register') {
-        window.history.pushState({}, '', '/login');
-        routes['/login'].component();
-    } else {
-        route.component();
-    }
-
-}
-function checkAuth() {
-    const sessionToken = localStorage.getItem('sessionToken');
-    return !!sessionToken;
+export function navigate(path) {
+    window.history.pushState({}, '', path);
+    renderContent(path);
 }
 
-function homeContent() {
-    document.getElementById('content').innerHTML = `
-        <div class="posts-wrapper">
-            <div id="posts-container" class="posts-list"></div>
-        </div>
-    `;
-
-    fetch('/posts')
-        .then(response => response.json())
-        .then(posts => {
-            const postsContainer = document.getElementById('posts-container');
-            posts.forEach(post => {
-                const postWrapper = document.createElement('div');
-                postWrapper.className = 'posts-container';
-                postWrapper.innerHTML = `
-                    <div class="post-card" data-post-id="${post.id}">
-                        <h2>${post.title}</h2>
-                        <p class="post-meta">Posted by ${post.username} on ${new Date(post.created_at).toLocaleDateString()}</p>
-                        <p class="post-content">${post.content}</p>
-                        <div class="post-categories">
-                            ${post.categories ? post.categories.map(cat => `<span class="category">${cat}</span>`).join('') : ''}
-                        </div>
-                        <div class="post-reactions">
-                            <span>👍 <span class="likes-count">${post.likes}</span></span>
-                            <span>👎 <span class="dislikes-count">${post.dislikes}</span></span>
-                        </div>
-                    </div>
-                `;
-                postsContainer.appendChild(postWrapper);
-            });
-
-            const postCards = document.querySelectorAll('.post-card');
-            postCards.forEach(card => {
-                card.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const postId = card.dataset.postId;
-                    window.history.pushState({}, '', `/post/${postId}`);
-                    renderContent(`/post/${postId}`);
-                });
-            });
-        });
+async function renderContent(path) {
+    const version = ++renderVersion;
+    const authenticated = Boolean(localStorage.getItem('sessionToken'));
+    if (path === '/profile') path = `/profile/${localStorage.getItem('userId') || ''}`;
+    if (path === '/logout') { await logout(); return; }
+    const authPage = path === '/login' || path === '/register';
+    if (authenticated && authPage) { navigate('/'); return; }
+    const privatePage = path === '/chat' || path === '/create_post' || path.startsWith('/profile/');
+    if (!authenticated && privatePage) { navigate('/login'); return; }
+    document.body.classList.toggle('auth-page', authPage);
+    document.body.classList.toggle('chat-page', path === '/chat');
+    document.title = `${authPage ? (path === '/login' ? 'Welcome back' : 'Join the conversation') : path === '/chat' ? 'Messages' : path === '/create_post' ? 'New discussion' : 'The common room'} · Yaplane`;
+    updateNavigation(path);
+    const content = document.getElementById('content');
+    content.innerHTML = '';
+    if (path === '/login') loginContent();
+    else if (path === '/register') registerContent();
+    else if (path === '/chat') chatContent();
+    else if (path === '/create_post') await createPostContent(version);
+    else if (/^\/profile\/\d+$/.test(path)) profileContent(path.split('/')[2]);
+    else if (/^\/post\/\d+$/.test(path)) await singlePostContent(path.split('/')[2], version);
+    else await homeContent(version);
 }
 
-function profileContent() {
+function updateNavigation(path = window.location.pathname) {
+    const authenticated = Boolean(localStorage.getItem('sessionToken'));
     const userId = localStorage.getItem('userId');
-    if (!userId) {
-        window.history.pushState({}, '', '/login');
-        loginContent();
-        return;
+    const username = localStorage.getItem('username') || 'You';
+    document.querySelectorAll('nav [data-route]').forEach(link => {
+        const selected = link.getAttribute('href') === path || (link.id === 'profileLink' && path.startsWith('/profile'));
+        link.classList.toggle('active', selected);
+        if (selected) link.setAttribute('aria-current', 'page');
+        else link.removeAttribute('aria-current');
+    });
+    document.getElementById('profileLink').href = authenticated ? `/profile/${userId}` : '/profile';
+    document.querySelector('.sidebar-footer a').hidden = !authenticated;
+    const actions = document.querySelector('.header-actions');
+    if (!authenticated) {
+        actions.innerHTML = '<a href="/login" data-route class="button button-quiet">Log in</a><a href="/register" data-route class="button button-dark"><span class="join-long">Join the community</span><span class="join-short">Join us</span>' + icon('arrow') + '</a>';
+        document.getElementById('onlineUsers').innerHTML = '<div class="members-invitation">' + icon('chat') + '<p>Meet your next conversation.</p><a href="/login" data-route>Sign in to connect ↗</a></div>';
+    } else if (!document.getElementById('headerProfile')) {
+        actions.innerHTML = '<span id="connectionStatus" class="connection-status" role="status">Connecting</span><a href="/create_post" data-route class="button button-dark header-create">' + icon('plus') + ' New discussion</a><a href="/profile" data-route id="headerProfile" class="avatar" aria-label="Your profile"></a>';
     }
-    const mainContainer = document.querySelector('.main-container');
-    
+    const profile = document.getElementById('headerProfile');
+    if (profile) { profile.textContent = initials(username); profile.href = `/profile/${userId}`; }
+}
 
+function sculpture() {
+    return '<div class="sculpture" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit-core"></div><span class="spark spark-one">✳</span><span class="spark spark-two">+</span><span class="sculpture-shadow"></span></div>';
+}
+
+async function homeContent(version) {
     document.getElementById('content').innerHTML = `
-        <div class="profile-container">
-            <div class="profile-header">
-                <div id="profileAvatar" class="profile-avatar"></div>
-                <div class="profile-info">
-                    <h2 id="fullName"></h2>
-                    <p id="username"></p>
-                </div>
-            </div>
-            <div class="profile-details">
-                <div class="detail-row">
-                    <span class="label">Email:</span>
-                    <span id="profileEmail"></span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Age:</span>
-                    <span id="profileAge"></span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Gender:</span>
-                    <span id="profileGender"></span>
-                </div>
-            </div>
-        </div>
-    `;
-    
+        <div class="feed-heading"><div><h2>The conversation</h2><p>Fresh perspectives from the community.</p></div><label class="sort-label">${icon('clock')}<select id="feedSort" aria-label="Sort discussions"><option value="newest">Latest first</option><option value="popular">Most liked</option></select></label></div>
+        <div class="feed-controls"><div id="topicFilters" class="filter-tabs" aria-label="Filter discussions by topic"></div><span id="feedCount" class="muted"></span></div>
+        <div id="searchSummary" class="search-summary" hidden></div>
+        <div id="posts-container" class="posts-list" aria-live="polite"><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
+        <div class="feed-end">You’re right where you belong. <span>✳</span></div>`;
+    document.getElementById('feedSort').value = sortOrder;
+    document.getElementById('feedSort').addEventListener('change', event => { sortOrder = event.target.value; renderFeed(); });
+    try {
+        const [posts, categories] = await Promise.all([api('/posts'), api('/categories')]);
+        if (version !== renderVersion) return;
+        feed = Array.isArray(posts) ? posts : [];
+        const topics = Array.isArray(categories) ? categories : [];
+        if (activeTopic && !topics.includes(activeTopic)) activeTopic = '';
+        document.getElementById('topicFilters').innerHTML = ['', ...topics].map(topic => `<button type="button" class="filter-tab" data-topic="${esc(topic)}" aria-pressed="${topic === activeTopic}">${esc(topic || 'All discussions')}</button>`).join('');
+        renderFeed();
+    } catch (error) {
+        if (version === renderVersion) document.getElementById('posts-container').innerHTML = emptyState('The room is taking a moment.', error.message) + '<button class="button button-quiet" id="retryFeed">Try again</button>';
+        document.getElementById('retryFeed')?.addEventListener('click', () => renderContent('/'));
+    }
+}
+
+function renderFeed() {
+    const container = document.getElementById('posts-container');
+    if (!container) return;
+    const query = searchQuery.trim().toLowerCase();
+    const posts = feed.filter(post => (!activeTopic || post.categories?.includes(activeTopic)) && (!query || `${post.title} ${post.content} ${post.username}`.toLowerCase().includes(query)));
+    posts.sort((a, b) => sortOrder === 'popular' ? b.likes - a.likes || new Date(b.created_at) - new Date(a.created_at) : new Date(b.created_at) - new Date(a.created_at));
+    document.getElementById('feedCount').textContent = `${posts.length} discussion${posts.length === 1 ? '' : 's'}`;
+    document.querySelectorAll('[data-topic]').forEach(button => {
+        button.classList.toggle('active', button.dataset.topic === activeTopic);
+        button.setAttribute('aria-pressed', String(button.dataset.topic === activeTopic));
+    });
+    const summary = document.getElementById('searchSummary');
+    summary.hidden = !query;
+    summary.textContent = `Results for “${searchQuery.trim()}” in the latest discussions`;
+    container.innerHTML = posts.length ? posts.map(post => `
+        <article class="post-card" data-post-id="${Number(post.id)}">
+            <div class="post-author"><span class="avatar avatar-soft tone-${Number(post.id) % 4}">${esc(initials(post.username))}</span><div><strong>${esc(post.username)}</strong><span>${esc(dateLabel(post.created_at))} <span class="meta-dot">·</span> Shared a thought</span></div><span class="post-category">${esc(post.categories?.[0] || 'Discussion')}</span></div>
+            <h3><a href="/post/${Number(post.id)}" data-route>${esc(post.title)}</a></h3>
+            <p class="post-preview">${esc(post.content)}</p>
+            <div class="post-footer"><div class="post-reactions"><button class="reaction-btn" data-like="${Number(post.id)}" aria-label="Like discussion">${icon('up')}<span class="likes-count">${post.likes || 0}</span></button><button class="reaction-btn" data-dislike="${Number(post.id)}" aria-label="Dislike discussion">${icon('down')}<span class="dislikes-count">${post.dislikes || 0}</span></button></div><a class="text-link" href="/post/${Number(post.id)}" data-route>Join discussion ${icon('arrow')}</a></div>
+        </article>`).join('') : emptyState(query || activeTopic ? 'No conversations here yet.' : 'Every community starts with a hello.', query || activeTopic ? 'Try another topic or search, or start a discussion of your own.' : 'Share a question, an idea, or something you’ve been thinking about.') + '<a href="/create_post" data-route class="button button-dark empty-cta">Start a discussion ' + icon('plus') + '</a>';
+}
+
+export async function refreshFeed() {
+    if (!document.getElementById('posts-container')) return;
+    const posts = await api('/posts');
+    if (!document.getElementById('posts-container')) return;
+    feed = Array.isArray(posts) ? posts : [];
+    renderFeed();
+}
+
+function selectTopic(topic) {
+    activeTopic = topic;
+    if (window.location.pathname !== '/') navigate('/');
+    else renderFeed();
+}
+
+function pageHeading(kicker, title, detail) {
+    return `<div class="page-heading"><span class="eyebrow">${kicker}</span><h1>${title}</h1><p>${detail}</p></div>`;
+}
+
+async function createPostContent(version) {
+    document.getElementById('content').innerHTML = pageHeading('SOMETHING ON YOUR MIND?', 'Start a conversation.', 'A question, a discovery, a different perspective. It all belongs here.') + `
+        <section class="form-panel"><form id="createPostForm"><label for="title">Give it a title <span class="field-hint">200 characters max</span></label><input id="title" name="title" maxlength="200" placeholder="What would you like to talk about?" required><label for="postContent">Your perspective <span class="field-hint">2,000 characters max</span></label><textarea id="postContent" name="content" maxlength="2000" rows="7" placeholder="Tell us more. A little context goes a long way…" required></textarea><label for="categories">Find its corner</label><p class="field-help">Choose one or more topics. Hold Ctrl or ⌘ to select multiple.</p><select id="categories" name="categories" multiple required aria-describedby="categoryHelp"></select><span id="categoryHelp" class="field-help">Choose at least one topic.</span><div class="form-footer"><a href="/" data-route class="button button-quiet">Cancel</a><button class="button button-dark" type="submit">Publish discussion ${icon('arrow')}</button></div></form></section>`;
+    const form = document.getElementById('createPostForm');
+    form.addEventListener('submit', handleCreatePost);
+    try {
+        const categories = await api('/categories');
+        if (version !== renderVersion) return;
+        document.getElementById('categories').innerHTML = (categories || []).map(category => `<option value="${esc(category)}">${esc(category)}</option>`).join('');
+    } catch (error) { if (version === renderVersion) displayErrors([error.message]); }
+}
+
+async function singlePostContent(postId, version) {
+    document.getElementById('content').innerHTML = '<a href="/" data-route class="back-link">' + icon('back') + ' Back to discussions</a><article id="post-content" class="post-detail"><div class="skeleton-card"></div></article><div id="comments-section"></div>';
+    try {
+        const post = await api(`/post/${postId}`);
+        if (version !== renderVersion) return;
+        const authenticated = Boolean(localStorage.getItem('sessionToken'));
+        document.getElementById('post-content').innerHTML = `<div class="post-author"><span class="avatar avatar-soft">${esc(initials(post.username))}</span><div><strong>${esc(post.username)}</strong><span>${esc(dateLabel(post.created_at))}</span></div></div><h1>${esc(post.title)}</h1><div class="post-content">${esc(post.content)}</div><div class="post-categories">${(post.categories || []).map(category => `<span class="category">${esc(category)}</span>`).join('')}</div><div class="post-footer"><div class="post-reactions"><button class="reaction-btn" data-like="${Number(post.id)}" aria-label="Like discussion">${icon('up')}<span class="likes-count">${post.likes || 0}</span></button><button class="reaction-btn" data-dislike="${Number(post.id)}" aria-label="Dislike discussion">${icon('down')}<span class="dislikes-count">${post.dislikes || 0}</span></button></div>${post.username === localStorage.getItem('username') ? `<button class="button button-quiet delete-btn" id="deleteDiscussion">${icon('trash')} Delete</button>` : ''}</div>`;
+        document.getElementById('deleteDiscussion')?.addEventListener('click', event => deletePost(post.id, event));
+        document.getElementById('comments-section').innerHTML = renderCommentSection(authenticated);
+        initializeComments(postId);
+    } catch (error) { if (version === renderVersion) document.getElementById('post-content').innerHTML = emptyState('Couldn’t open this discussion.', error.message); }
+}
+
+function profileContent(userId) {
+    document.getElementById('content').innerHTML = pageHeading('THE PERSON BEHIND THE PERSPECTIVE', 'A little about you.', 'Your own corner of the common room.') + `<section class="profile-container"><div class="profile-header"><div id="profileAvatar" class="profile-avatar">…</div><div><h2 id="fullName">Loading profile…</h2><p id="username" class="muted"></p></div></div><div class="profile-details"><div class="detail-row"><span>Email address</span><strong id="profileEmail"></strong></div><div class="detail-row"><span>Age</span><strong id="profileAge"></strong></div><div class="detail-row"><span>Gender</span><strong id="profileGender"></strong></div></div></section>`;
     loadProfileData(userId);
 }
 
-
-async function createPostContent() {
-    const response = await fetch('/categories');
-    const categories = await response.json();
-    
-    const categoriesOptions = categories.map(category => 
-        `<option value="${category}">${category}</option>`
-    ).join('');
-
-    document.getElementById('content').innerHTML = `
-        <div class="create-post-container">
-            <h2>Create New Post</h2>
-            <form id="createPostForm">
-                <input type="text" id="title" placeholder="Post Title" required>
-                <textarea id="postContent" placeholder="Write your post here..." required></textarea>
-                <div class="categories-section">
-                    <select id="categories" multiple>
-                        ${categoriesOptions}
-                    </select>
-                </div>
-                <button type="submit">Create Post</button>
-            </form>
-        </div>
-    `;
-
-    document.getElementById('createPostForm').addEventListener('submit', handleCreatePost);
-}
-function singlePostContent() {
-    const postId = window.location.pathname.split('/')[2];
-    
-    document.getElementById('content').innerHTML = `
-        <div class="single-post-container">
-            <div id="post-content">Loading post...</div>
-            <div id="comments-section"></div>
-        </div>
-    `;
-
-    fetch(`/post/${postId}`)
-        .then(response => response.json())
-        .then(post => {
-            const currentUsername = localStorage.getItem('username');
-            document.getElementById('post-content').innerHTML = `
-                <h2>${post.title}</h2>
-                <p class="post-meta">Posted by ${post.username} on ${new Date(post.created_at).toLocaleDateString()}</p>
-                <div class="post-content">${post.content}</div>
-                <div class="post-categories">
-                    ${post.categories ? post.categories.map(cat => `<span class="category">${cat}</span>`).join('') : ''}
-                </div>
-                <div class="post-reactions">
-                    <button onclick="handleLike(${post.id}, true)" class="like-btn">
-                        👍 <span class="likes-count">${post.likes}</span>
-                    </button>
-                    <button onclick="handleLike(${post.id}, false)" class="dislike-btn">
-                        👎 <span class="dislikes-count">${post.dislikes}</span>
-                    </button>
-                </div>
-                ${post.username === currentUsername ? `
-                    <div class="post-actions">
-                        <button class="delete-btn" onclick="deletePost(${post.id}, event)">
-                            🗑️ Delete Post
-                        </button>
-                    </div>
-                ` : ''}
-            `;
-            document.getElementById('comments-section').innerHTML = renderCommentSection(postId);
-            initializeComments(postId);
-        });
-}
 function chatContent() {
-    const pageLoadCount = sessionStorage.getItem('chatPageLoad');
-
-    if (!pageLoadCount) {
-        sessionStorage.setItem('chatPageLoad', '1');
-    } else if (window.location.pathname === '/chat') {
-        sessionStorage.removeItem('chatPageLoad');
-        window.history.pushState({}, '', '/');
-        routes['/'].component();
-        return;
-    }
-    document.getElementById('content').innerHTML = `
-        <div class="chat-main">
-            <div id="selectedUserName" class="selected-user">Chat with: ${window.wsClient?.currentChatUser?.username || ''}</div>
-            <div class="chat-messages" id="messageHistory"></div>
-            <div id="typingIndicator" class="typing-indicator"></div>
-            <form id="messageForm" class="chat-input">
-                <input type="text" id="messageInput" placeholder="Type a message...">
-                <button type="submit">Send</button>
-            </form>
-        </div>
-    `;
-    initializeScrollListener();
-    
-
-    const messageForm = document.getElementById('messageForm');
-    if (messageForm) {
-        messageForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const messageInput = document.getElementById('messageInput');
-            const content = messageInput.value.trim();
-            
-            if (content && window.wsClient && window.wsClient.currentChatUser) {
-                let success = sendPrivateMessage(window.wsClient.socket, window.wsClient.currentChatUser, content);
-                messageInput.value = '';
-                if(!success){
-                    return;
-                }
-                
-            
-                const messageHistory = document.getElementById('messageHistory');
-                const messageElement = document.createElement('div');
-                messageElement.className = 'message sent';
-                messageElement.innerHTML = `
-                    <div class="message-content">
-                        <span class="message-text">${content}</span>
-                        <span class="message-time">${new Date().toLocaleTimeString()}</span>
-                    </div>
-                `;
-                messageHistory.appendChild(messageElement);
-                messageHistory.scrollTop = messageHistory.scrollHeight;
-            }
-        });
-    }
-
-    if (window.wsClient) {
-        window.wsClient.connect();
-    }
-
-    const messageInput = document.getElementById('messageInput');
-    if (messageInput) {
-        let typingTimeout;
-        messageInput.addEventListener('input', () => {
-            if (window.wsClient?.socket?.readyState === WebSocket.OPEN && window.wsClient.currentChatUser) {
-                const typingMessage = {
-                    type: 'typing_status',
-                    content: {
-                        receiver_id: window.wsClient.currentChatUser,
-                        isTyping: true,
-                        username: localStorage.getItem('username')
-                    }
-                };
-                window.wsClient.socket.send(JSON.stringify(typingMessage));
-
-                clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => {
-                    const stopTypingMessage = {
-                        type: 'typing_status',
-                        content: {
-                            receiver_id: window.wsClient.currentChatUser,
-                            isTyping: false,
-                            username: localStorage.getItem('username')
-                        }
-                    };
-                    window.wsClient.socket.send(JSON.stringify(stopTypingMessage));
-                }, 1000);
-            }
-        });
-    }
+    document.getElementById('content').innerHTML = pageHeading('MAKE A CONNECTION', 'A conversation, just for you.', 'Select someone from the community to say hello.') + `<section class="chat-main"><div class="chat-heading"><span class="avatar avatar-soft" id="chatAvatar">${icon('chat')}</span><div><h2 id="selectedUserName">Your messages</h2><span id="chatStatus" class="muted">Choose a person to start</span></div></div><div class="chat-messages" id="messageHistory">${emptyState('Good things start with hello.', 'Pick someone from the people panel to open your conversation.')}</div><div id="typingIndicator" class="typing-indicator" role="status"></div><form id="messageForm" class="chat-input" hidden><label class="sr-only" for="messageInput">Your message</label><input id="messageInput" placeholder="Say something kind…" autocomplete="off" maxlength="2000" required><button type="submit" class="button button-dark" aria-label="Send message">${icon('send')}</button></form></section>`;
+    const badge = document.getElementById('message-badge');
+    badge.hidden = true;
+    badge.textContent = '0';
+    initializeChat(window.wsClient);
+    if (window.wsClient) updateUsersList(window.wsClient, window.wsClient.users || []);
 }
 
-function registerContent() {
-    document.body.className = 'login-page';
-    document.getElementById('content').innerHTML = `
-        <div class="register-container">
-            <h1>Create Account</h1>
-            <form id="registerForm" class="register-form">
-                <div class="form-group">
-                    <input type="text" id="username" placeholder="Username" required>
-                </div>
-                <div class="form-group">
-                    <input type="email" id="email" placeholder="Email" required>
-                </div>
-                <div class="form-group">
-                    <input type="password" id="password" placeholder="Password" required>
-                </div>
-                <div class="form-group">
-                    <input type="text" id="first_name" placeholder="First Name" required>
-                </div>
-                <div class="form-group">
-                    <input type="text" id="last_name" placeholder="Last Name" required>
-                </div>
-                <div class="form-group">
-                    <input type="number" id="age" placeholder="Age" min="1" max="120" required>
-                </div>
-                <div class="form-group gender-group">
-                    <label>Gender:</label>
-                    <div class="gender-options">
-                        <label class="gender-label">
-                            <input type="radio" id="male" name="gender" value="male" required>
-                            Male
-                        </label>
-                        <label class="gender-label">
-                            <input type="radio" id="female" name="gender" value="female" required>
-                            Female
-                        </label>
-                    </div>
-                </div>
-                <button type="submit" class="register-btn">Create Account</button>
-            </form>
-        </div>
-    `;
-
-    document.getElementById('registerForm').addEventListener('submit', handleRegisterSubmit);
+function authLayout(form, registering = false) {
+    document.getElementById('content').innerHTML = `<div class="auth-layout"><section class="auth-story"><span class="eyebrow">WELCOME TO YAPLANE</span><h1>Good company.<br><em>Better conversations.</em></h1><p>A space for the endlessly curious.<br>And a seat with your name on it.</p>${sculpture()}<div class="auth-story-footer"><span class="tiny-star">✳</span><span>A little space for big ideas.</span></div></section><section class="auth-form-wrap"><span class="eyebrow">${registering ? 'YOUR NEXT CONVERSATION STARTS HERE' : 'YOUR SEAT IS STILL HERE'}</span><h2>${registering ? 'Find your people.' : 'Welcome back.'}</h2><p>${registering ? 'Join the common room. Bring your perspective.' : 'Pick up where the conversation left off.'}</p>${form}</section></div>`;
 }
 
 function loginContent() {
-    document.body.className = 'login-page';
-    const sessionToken = localStorage.getItem('sessionToken');
-    if (sessionToken) {
-        window.history.pushState({}, '', '/');
-        renderContent('/');
-        return;
-    }
-
-    document.getElementById('content').innerHTML = `
-        <div class="login-wrapper">
-            <div class="login-container">
-                <div class="login-header">
-                    <h1>Welcome Back</h1>
-                    <p>Please login to your account</p>
-                </div>
-                <form id="loginForm" class="login-form">
-                    <div class="form-group">
-                        <label for="username">Username or Email</label>
-                        <input type="text" id="username" placeholder="Enter your username or email" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <input type="password" id="password" placeholder="Enter your password" required>
-                    </div>
-                    <button type="submit" class="login-btn">Sign In</button>
-                    <div class="form-footer">
-                        <p>Don't have an account? <a href="/register" class="register-link">Create Account</a></p>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-
+    authLayout(`<form id="loginForm"><label for="username">Username or email</label><input id="username" name="username" autocomplete="username" placeholder="you@example.com" required><label for="password">Password</label><input type="password" id="password" name="password" autocomplete="current-password" placeholder="Your password" required><button type="submit" class="button button-dark full-width">Come on in ${icon('arrow')}</button></form><p class="auth-switch">New around here? <a href="/register" data-route>Join the community</a></p>`);
     document.getElementById('loginForm').addEventListener('submit', handleLoginSubmit);
 }
-function handleRoute(event) {
-    event.preventDefault();
-    const path = event.target.getAttribute('href');
-    window.history.pushState({}, '', path);
-    renderContent(path);
-    
-    if (path === '/chat' && window.wsClient) {
-        window.wsClient.connect();
 
-    }
+function registerContent() {
+    authLayout(`<form id="registerForm"><div class="form-grid"><div><label for="first_name">First name</label><input id="first_name" name="first_name" autocomplete="given-name" required></div><div><label for="last_name">Last name</label><input id="last_name" name="last_name" autocomplete="family-name" required></div></div><label for="username">Username</label><input id="username" name="username" autocomplete="username" required><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required><span class="field-help">Use 8–72 characters.</span><div class="form-grid"><div><label for="age">Age</label><input id="age" name="age" type="number" min="1" max="120" required></div><fieldset class="gender-group"><legend>Gender</legend><div class="gender-options"><label><input type="radio" name="gender" value="male" required> Male</label><label><input type="radio" name="gender" value="female" required> Female</label></div></fieldset></div><button type="submit" class="button button-dark full-width">Make yourself at home ${icon('arrow')}</button></form><p class="auth-switch">Already part of the room? <a href="/login" data-route>Log in</a></p>`, true);
+    document.getElementById('registerForm').addEventListener('submit', handleRegisterSubmit);
 }
 
-async function logoutContent(event) {
-    if (event) {
-        event.preventDefault();
-    }
-
-    const sessionToken = localStorage.getItem('sessionToken');
-
-    if (!sessionToken) {
-        window.history.pushState({}, '', '/login');
-        loginContent();
-        return;
-    }
-
+async function logout() {
     try {
-        const response = await fetch('/logout', {
-            method: 'POST',
-            headers: {
-                'Authorization': sessionToken
-            }
-        });
-
-        if (response.ok) {
-            localStorage.removeItem('sessionToken');
-            localStorage.removeItem('username');
-            localStorage.removeItem('userId');
-            updateNavigation();
-            window.history.pushState({}, '', '/login');
-            loginContent();
-        } else {
-            console.error('Logout failed with status:', response.status);
-            window.history.pushState({}, '', '/login');
-            loginContent();
-        }
-    } catch (error) {
-        console.error('Logout failed:', error);
-        window.history.pushState({}, '', '/login');
-        loginContent();
-    }
+        await api('/logout', { method: 'POST' });
+        window.wsClient?.disconnect();
+        ['sessionToken', 'userId', 'username'].forEach(key => localStorage.removeItem(key));
+        navigate('/');
+    } catch (error) { showToast(error.message); }
 }
 
-
-function updateNavigation() {
-    const sessionToken = localStorage.getItem('sessionToken');
-    const homeLink = document.querySelector('a[href="/"]');
-    const profileLink = document.getElementById('profileLink');
-    const registerLink = document.querySelector('a[href="/register"]');
-    const logoutLink = document.querySelector('a[href="/logout"]');
-    const loginLink = document.querySelector('a[href="/login"]');
-    const createPostLink = document.querySelector('a[href="/create_post"]');
-
-    
-    if (sessionToken) {
-        const userId = localStorage.getItem('userId');
-        if (homeLink) homeLink.style.display = 'block';
-        if (profileLink) {
-            profileLink.href = `/profile/${userId}`;
-            profileLink.style.display = 'block';
-        }
-        if (registerLink) registerLink.style.display = 'none';
-        if (logoutLink) logoutLink.style.display = 'block';
-        if (loginLink) loginLink.style.display = 'none';
-        if (createPostLink) createPostLink.style.display = 'block';
-    } else {
-        
-        if (homeLink) homeLink.style.display = 'none';
-        if (profileLink){
-            profileLink.style.display = 'none';
-        }
-        if (registerLink) registerLink.style.display = 'block';
-        if (logoutLink){
-            logoutLink.style.display = 'none';
-        } 
-        if (loginLink) loginLink.style.display = 'block';
-        if (createPostLink) createPostLink.style.display = 'none';
-    }
-}
-function initRouter() {
-    document.querySelectorAll('a').forEach(link => {
-        const path = link.getAttribute('href');
-        
-        if (path === '/logout') {
-            link.addEventListener('click', logoutContent);
-        } else if (path.startsWith('/profile')) {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const userId = localStorage.getItem('userId');
-                window.history.pushState({}, '', `/profile/${userId}`);
-                profileContent();
-            });
-        } else {
-            link.addEventListener('click', handleRoute);
-        }
-    });
-
-    window.onpopstate = () => {
-        renderContent(window.location.pathname);
-    };
-
-    renderContent(window.location.pathname);
-    updateNavigation();
-}
-function throttle(func, limit) {
-    let inThrottle;
-    return function(...args) {
-        if (!inThrottle) {
-            func.apply(this, args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-        }
-    }
-}
-function displayErrors(errors) {
-    const form = document.querySelector('form');
+export function displayErrors(errors) {
+    const form = document.querySelector('#content form');
     if (!form) return;
-    
-    const existingErrors = document.querySelector('.error-messages');
-    if (existingErrors) {
-        existingErrors.remove();
-    }
-
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-messages';
-    errorDiv.innerHTML = errors.map(error => `<p>${error}</p>`).join('');
-    form.insertBefore(errorDiv, form.firstChild);
+    form.querySelector('.error-messages')?.remove();
+    const node = document.createElement('div');
+    node.className = 'error-messages';
+    node.setAttribute('role', 'alert');
+    node.innerHTML = errors.map(error => `<p>${esc(error)}</p>`).join('');
+    form.prepend(node);
 }
 
-export { initRouter, displayErrors, renderContent };
-
-
-
-
-
-
-
+export function initRouter() {
+    document.addEventListener('click', event => {
+        const topic = event.target.closest('[data-topic]');
+        if (topic) { selectTopic(topic.dataset.topic); return; }
+        const reaction = event.target.closest('[data-like], [data-dislike]');
+        if (reaction) {
+            if (!localStorage.getItem('sessionToken')) { navigate('/login'); return; }
+            handleLike(Number(reaction.dataset.like || reaction.dataset.dislike), Boolean(reaction.dataset.like));
+            return;
+        }
+        const link = event.target.closest('a[data-route]');
+        if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
+        event.preventDefault();
+        navigate(link.getAttribute('href'));
+    });
+    window.addEventListener('popstate', () => renderContent(window.location.pathname));
+    const search = document.getElementById('globalSearch');
+    search.addEventListener('input', () => { searchQuery = search.value; if (window.location.pathname !== '/') navigate('/'); else renderFeed(); });
+    document.addEventListener('keydown', event => {
+        if (event.key === '/' && !event.target.closest('input, textarea, select, [contenteditable]')) { event.preventDefault(); search.focus(); }
+    });
+    renderContent(window.location.pathname);
+    api('/categories').then(categories => {
+        document.getElementById('topicNavigation').innerHTML = (categories || []).map((topic, index) => `<button class="topic-button" data-topic="${esc(topic)}"><span class="topic-dot tone-${index % 4}"></span>${esc(topic)}</button>`).join('');
+    }).catch(() => { document.getElementById('topicNavigation').innerHTML = '<p class="muted">Topics are unavailable.</p>'; });
+}
