@@ -1,56 +1,32 @@
-import { initRouter } from './router.js';
+﻿import { initRouter } from './router.js';
 import { WebSocketClient } from './websocket.js';
 import { initMessageHandlers } from './message.js';
-import { initNotifications } from './notifications.js';
-import { loadProfileData } from './profile.js';
+import { hydrateIcons } from './ui.js';
+import { updateUsersList } from './chat.js';
+import { initTheme } from './theme.js';
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const wsClient = new WebSocketClient();
-        initRouter();
-        initMessageHandlers(wsClient);
-        initNotifications();
-        initSessionValidator();
-        wsClient.connect(); 
-        
-        let nav = document.querySelector('nav');
-        if (!nav) {
-            nav = document.createElement('nav');
-            document.body.insertBefore(nav, document.body.firstChild);
-        }
-
-
-        wsClient.addMessageHandler('chat', (content) => {
-            console.log('Received chat message:', content);
-            const chatMessages = document.getElementById('chatMessages');
-            if (chatMessages) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message';
-                messageDiv.innerHTML = `
-                    <span class="sender">${content.sender}:</span>
-                    <span class="text">${content.message}</span>
-                `;
-                chatMessages.appendChild(messageDiv);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-        });
-
-        window.wsClient = wsClient;
-    });
-    
-    function initSessionValidator() {
-        
-        checkAuthStatus();
-    
-        setInterval(checkAuthStatus, 30000);
-    }
-
-    async function checkAuthStatus() {
-        if (window.location.pathname === '/register' || window.location.pathname === '/login') {
-            return;
-        }
+async function validateSession() {
+    if (!localStorage.getItem('sessionToken')) return;
+    try {
         const response = await fetch('/check-auth');
-        if (!response.ok) {
-            localStorage.clear();
-            window.location.href = '/login';
+        if (response.status === 401) {
+            window.wsClient.disconnect();
+            ['sessionToken', 'username', 'userId'].forEach(key => localStorage.removeItem(key));
+            window.location.replace('/login');
         }
-    }
+    } catch (error) { console.warn('Session check unavailable:', error); }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    initTheme();
+    window.wsClient = new WebSocketClient();
+    initMessageHandlers(window.wsClient);
+    hydrateIcons();
+    initRouter();
+    window.addEventListener('connectionchange', () => {
+        if (localStorage.getItem('sessionToken') && window.wsClient.users.length) updateUsersList(window.wsClient, window.wsClient.users);
+    });
+    await validateSession();
+    window.wsClient.connect();
+    setInterval(validateSession, 30000);
+});
