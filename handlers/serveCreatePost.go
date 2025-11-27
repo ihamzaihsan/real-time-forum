@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -22,16 +23,22 @@ func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    if len(post.Title) > 100 {
-        http.Error(w, "Title must be 100 characters or less", http.StatusBadRequest)
-        return
-    }
+	post.Title = strings.TrimSpace(post.Title)
+	post.Content = strings.TrimSpace(post.Content)
+	if post.Title == "" || post.Content == "" {
+		http.Error(w, "Title and content are required", http.StatusBadRequest)
+		return
+	}
+	if len([]rune(post.Title)) > 200 {
+		http.Error(w, "Title must be 200 characters or less", http.StatusBadRequest)
+		return
+	}
 
-    if len(post.Content) > 5000 {
-        http.Error(w, "Content must be 5000 characters or less", http.StatusBadRequest)
-        return
-    }
-	
+	if len([]rune(post.Content)) > 2000 {
+		http.Error(w, "Content must be 2000 characters or less", http.StatusBadRequest)
+		return
+	}
+
 	if len(post.Categories) == 0 {
 		http.Error(w, "At least one category is required", http.StatusBadRequest)
 		return
@@ -74,6 +81,7 @@ func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	go broadcastMessage(Message{Type: "new_post", Content: map[string]interface{}{"post_id": postID}})
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Post created successfully",

@@ -1,70 +1,20 @@
-import { renderContent } from './router.js';
+﻿import { displayErrors, navigate } from './router.js';
+import { api, showToast } from './ui.js';
 
-export async function handleCreatePost(e) {
-    e.preventDefault();
-    let title = document.getElementById('title').value.trim();
-    let content = document.getElementById('postContent').value.trim();
-
-    
-    title = title.replace(/[<>]/g, '');
-    content = content.replace(/[<>]/g, '');
-
-     
-     if (title.length > 100) {
-        alert('Title must be 100 characters or less');
-        return;
-    }
-
-    if (content.length > 500) {
-        alert('Content must be 500 characters or less');
-        return;
-    }
-
-    if (title.length == 0) {
-        alert('Title must be more than one character');
-        return;
-    }
-
-    if (content.length == 0) {
-        alert('Content must be more than one character');
-        return;
-    }
-
-
-    const categoriesSelect = document.getElementById('categories');
-    const categories = Array.from(categoriesSelect.selectedOptions).map(option => option.value);
-
-    
-    if (categories.length === 0) {
-        alert('Please select at least one category');
-        return;
-    }
-
-    const postData = {
-        title,
-        content,
-        categories
-    };
-
+export async function handleCreatePost(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const title = form.elements.title.value.trim();
+    const content = form.elements.content.value.trim();
+    const categories = Array.from(form.elements.categories.selectedOptions, option => option.value);
+    if (!title || !content || !categories.length) { displayErrors(['Add a title, your perspective, and at least one topic.']); return; }
+    if (title.length > 200 || content.length > 2000) { displayErrors(['Use at most 200 characters for the title and 2,000 for the post.']); return; }
+    button.disabled = true;
     try {
-        const response = await fetch('/create_post', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': localStorage.getItem('sessionToken')
-            },
-            body: JSON.stringify(postData)
-        });
-
-        if (response.ok) {
-            window.history.pushState({}, '', '/');
-            renderContent('/');
-        } else {
-            const errorData = await response.text();
-            alert('Error creating post: ' + errorData);
-        }
-    } catch (error) {
-        console.error('Error creating post:', error);
-        alert('Error creating post: ' + error.message);
-    }
+        await api('/create_post', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, content, categories }) });
+        showToast('Your perspective is now part of the conversation.');
+        navigate('/');
+    } catch (error) { displayErrors([error.message]); }
+    finally { button.disabled = false; }
 }
