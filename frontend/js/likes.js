@@ -1,71 +1,26 @@
-export function handleLike(postId, isLike) {
-    const formData = new FormData();
-    formData.append('post_id', postId);
-    formData.append('is_like', isLike);
+﻿import { api, showToast } from './ui.js';
 
-    fetch('/like', {
-        method: 'POST',
-        headers: {
-            'Authorization': localStorage.getItem('sessionToken')
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        
-        const postElements = document.querySelectorAll(`[data-post-id="${postId}"]`);
-        postElements.forEach(element => {
-            const likesCount = element.querySelector('.likes-count');
-            const dislikesCount = element.querySelector('.dislikes-count');
-            if (likesCount) likesCount.textContent = data.likes;
-            if (dislikesCount) dislikesCount.textContent = data.dislikes;
+const pendingReactions = new Set();
+
+async function react(kind, id, isLike) {
+    const key = `${kind}:${id}`;
+    if (pendingReactions.has(key)) return;
+    pendingReactions.add(key);
+    const body = new FormData();
+    body.set(kind === 'post' ? 'post_id' : 'comment_id', id);
+    body.set('is_like', String(isLike));
+    try {
+        const result = await api(kind === 'post' ? '/like' : '/comment/like', { method: 'POST', body });
+        const selector = kind === 'post' ? `[data-post-id="${id}"], #post-content` : `[data-comment-id="${id}"]`;
+        document.querySelectorAll(selector).forEach(node => {
+            const likes = node.querySelector('.likes-count');
+            const dislikes = node.querySelector('.dislikes-count');
+            if (likes) likes.textContent = result.likes;
+            if (dislikes) dislikes.textContent = result.dislikes;
         });
-
-        
-        const postContent = document.getElementById('post-content');
-        if (postContent) {
-            const likesCount = postContent.querySelector('.likes-count');
-            const dislikesCount = postContent.querySelector('.dislikes-count');
-            if (likesCount) likesCount.textContent = data.likes;
-            if (dislikesCount) dislikesCount.textContent = data.dislikes;
-        }
-    })
-    .catch(error => console.error('Error:', error));
+    } catch (error) { showToast(error.message); }
+    finally { pendingReactions.delete(key); }
 }
 
-window.handleLike = handleLike;
-
-export function handleCommentLike(commentId, isLike) {
-    const formData = new FormData();
-    formData.append('comment_id', commentId);
-    formData.append('is_like', isLike);
-
-    fetch('/comment/like', {
-        method: 'POST',
-        headers: {
-            'Authorization': localStorage.getItem('sessionToken')
-        },
-        body: formData
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
-        if (commentElement) {
-            const likesCount = commentElement.querySelector('.likes-count');
-            const dislikesCount = commentElement.querySelector('.dislikes-count');
-            
-            if (likesCount) likesCount.textContent = data.likes;
-            if (dislikesCount) dislikesCount.textContent = data.dislikes;
-        }
-    })
-    .catch(error => {
-        console.error('Like/Dislike operation failed:', error);
-    });
-}
-
-window.handleCommentLike = handleCommentLike;
+export function handleLike(postId, isLike) { return react('post', Number(postId), isLike); }
+export function handleCommentLike(commentId, isLike) { return react('comment', Number(commentId), isLike); }
