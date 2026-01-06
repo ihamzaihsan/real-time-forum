@@ -1,79 +1,58 @@
-import { renderComments } from './comments.js';
-
-    export class WebSocketClient {
-        addMessageHandler(type, handler) {
-            this.messageHandlers.set(type, handler);
-        }
-
-        constructor() {
-            this.socket = null;
-            this.messageHandlers = new Map();
-            this.messageHistory = new Map();
-            this.currentChatUser = null;
-            this.onlineUsers = new Map();
-
-            this.addMessageHandler('new_comment', (content) => {
-                const commentsList = document.getElementById('commentsList');
-                if (commentsList) {
-                    const currentPostId = window.location.pathname.split('/')[2];
-                    if (currentPostId == content.post_id) {
-                        renderComments([content]);
-                    }
-                }
-            });
-            
-            this.addMessageHandler('typing_status', (content) => {
-                const typingIndicator = document.getElementById('typingIndicator');
-                if (typingIndicator) {
-                    if (content.isTyping) {
-                        typingIndicator.style.display = 'inline-block';
-                        typingIndicator.textContent = `${content.username} is typing...`;
-                    } else {
-                        typingIndicator.style.display = 'none';
-                        typingIndicator.textContent = '';
-                    }
-                                    }
-            });
-    
-        }
-        connect() {
-        console.log('Attempting WebSocket connection...');
-        const sessionToken = localStorage.getItem('sessionToken');
-
-        if (!sessionToken) {
-            console.error('No session token found, skipping WebSocket connection');
-            return;
-        }
-
-        this.socket = new WebSocket(`ws://localhost:8080/ws?token=${sessionToken}`);
-        this.socket.onopen = () => {
-            console.log('WebSocket connected successfully');
-        };
-
-        this.socket.onmessage = (event) => {
-            try {
-                const message = JSON.parse(event.data);
-                const handler = this.messageHandlers.get(message.type);
-                if (handler) {
-                    handler(message.content);
-                }
-            } catch (error) {
-                console.error('Error handling WebSocket message:', error);
-            }
-        };
-
-        this.socket.onclose = (event) => {
-            console.warn('WebSocket connection closed:', event.reason || 'Unknown reason');
-            if (event.code !== 1000) {
-                setTimeout(() => this.connect(), 5000);
-            }
-        };
-
-        this.socket.onerror = (error) => {
-            console.error('WebSocket error:', error);
-        };
+﻿export class WebSocketClient {
+    constructor() {
+        this.socket = null;
+        this.messageHandlers = new Map();
+        this.currentChatUser = null;
+        this.currentChatName = '';
+        this.onlineUsers = new Map();
+        this.users = [];
+        this.reconnectTimer = null;
+        this.stopped = false;
     }
 
+    addMessageHandler(type, handler) { this.messageHandlers.set(type, handler); }
+
+    setStatus(text, connected = false) {
+        const status = document.getElementById('connectionStatus');
+        if (status) { status.textContent = text; status.classList.toggle('connected', connected); }
+        window.dispatchEvent(new CustomEvent('connectionchange'));
+    }
+
+    connect() {
+        const token = localStorage.getItem('sessionToken');
+        if (!token) return;
+        if (this.socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(this.socket.readyState)) return;
+        this.stopped = false;
+        clearTimeout(this.reconnectTimer);
+        const url = new URL('/ws', window.location.href);
+        url.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        url.searchParams.set('token', token);
+        const socket = new WebSocket(url.href);
+        this.socket = socket;
+        this.setStatus('Connecting');
+        socket.onopen = () => this.setStatus('Live', true);
+        socket.onmessage = async event => {
+            try {
+                const message = JSON.parse(event.data);
+                await this.messageHandlers.get(message.type)?.(message.content);
+            } catch (error) { console.error('Could not handle a live update:', error); }
+        };
+        socket.onclose = () => {
+            if (this.socket !== socket) return;
+            this.setStatus('Reconnecting');
+            if (!this.stopped && localStorage.getItem('sessionToken')) this.reconnectTimer = setTimeout(() => this.connect(), 5000);
+        };
+        socket.onerror = () => this.setStatus('Connection interrupted');
+    }
+
+    disconnect() {
+        this.stopped = true;
+        clearTimeout(this.reconnectTimer);
+        const socket = this.socket;
+        this.socket = null;
+        if (socket) socket.close(1000, 'Signed out');
+        this.onlineUsers.clear();
+        this.users = [];
+        this.currentChatUser = null;
+    }
 }
-
-
