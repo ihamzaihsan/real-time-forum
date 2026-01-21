@@ -11,11 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
+var upgrader = websocket.Upgrader{}
 
 type Message struct {
 	Type    string      `json:"type"`
@@ -23,8 +19,8 @@ type Message struct {
 }
 
 type SafeConn struct {
-    conn *websocket.Conn
-    mu   sync.Mutex
+	conn *websocket.Conn
+	mu   sync.Mutex
 }
 
 var clients = make(map[int]*SafeConn)
@@ -44,9 +40,9 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    safeConn := &SafeConn{
-        conn: conn,
-    }
+	safeConn := &SafeConn{
+		conn: conn,
+	}
 
 	r.Header.Set("Authorization", sessionToken)
 
@@ -68,7 +64,6 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	clients[userID] = safeConn
 	clientsMutex.Unlock()
 
-
 	_, err = database.DBInstance.DB.Exec(
 		"UPDATE users SET is_online = TRUE WHERE id = ?",
 		userID,
@@ -80,7 +75,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		clientsMutex.Lock()
 		delete(clients, userID)
 		clientsMutex.Unlock()
-		
+
 		_, err := database.DBInstance.DB.Exec(
 			"UPDATE users SET is_online = FALSE WHERE id = ?",
 			userID,
@@ -88,11 +83,11 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("[ERROR] Failed to update offline status: %v", err)
 		}
-		
+
 		go broadcastActiveUsers()
-		
+
 		conn.Close()
-		
+
 	}()
 
 	for {
@@ -104,8 +99,8 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		switch msg.Type {
 		case "private_message":
 			handlePrivateMessage(userID, username, msg.Content)
-			case "typing_status":
-				handleTypingStatus(userID, username, msg.Content)
+		case "typing_status":
+			handleTypingStatus(userID, username, msg.Content)
 		case "ping":
 			err = safeConn.WriteJSON(Message{
 				Type: "pong",
@@ -122,72 +117,88 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func handleTypingStatus(senderID int, senderUsername string, content interface{}) {
-    
-    contentMap, ok := content.(map[string]interface{})
-    if !ok {
-        return
-    }
 
-    receiverID, ok := contentMap["receiver_id"].(float64)
-    if !ok {
-        return
-    }
+	contentMap, ok := content.(map[string]interface{})
+	if !ok {
+		return
+	}
 
-    isTyping, ok := contentMap["isTyping"].(bool)
-    if !ok {
-        return
-    }
+	receiverID, ok := contentMap["receiver_id"].(float64)
+	if !ok {
+		return
+	}
 
-    
-    clientsMutex.RLock()
-    if recipientConn, ok := clients[int(receiverID)]; ok {
-        err := recipientConn.WriteJSON(Message{
-            Type: "typing_status",
-            Content: map[string]interface{}{
-                "user_id":  senderID,
-                "username": senderUsername,
-                "isTyping": isTyping,
-            },
-        })
-        if err != nil {
-            log.Printf("[DEBUG] Error sending typing status: %v", err)
-        }
-    } else {
-        log.Printf("[DEBUG] Recipient connection not found")
-    }
-    clientsMutex.RUnlock()
+	isTyping, ok := contentMap["isTyping"].(bool)
+	if !ok {
+		return
+	}
+
+	clientsMutex.RLock()
+	if recipientConn, ok := clients[int(receiverID)]; ok {
+		err := recipientConn.WriteJSON(Message{
+			Type: "typing_status",
+			Content: map[string]interface{}{
+				"user_id":  senderID,
+				"username": senderUsername,
+				"isTyping": isTyping,
+			},
+		})
+		if err != nil {
+			log.Printf("[DEBUG] Error sending typing status: %v", err)
+		}
+	} else {
+		log.Printf("[DEBUG] Recipient connection not found")
+	}
+	clientsMutex.RUnlock()
 }
 func (sc *SafeConn) WriteJSON(v interface{}) error {
-    sc.mu.Lock()
-    defer sc.mu.Unlock()
-    return sc.conn.WriteJSON(v)
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	if err := sc.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		return err
+	}
+	return sc.conn.WriteJSON(v)
+}
+
+func broadcastMessage(message Message) {
+	clientsMutex.RLock()
+	snapshot := make([]*SafeConn, 0, len(clients))
+	for _, client := range clients {
+		snapshot = append(snapshot, client)
+	}
+	clientsMutex.RUnlock()
+	for _, client := range snapshot {
+		if err := client.WriteJSON(message); err != nil {
+			log.Printf("Failed to send live update: %v", err)
+		}
+	}
 }
 
 func broadcastActiveUsers() {
-    for {
-        clientsMutex.RLock()
-        for userID := range clients {
-            
-            users, err := getActiveUsers(database.DBInstance.DB, userID)
-            if err != nil {
-                log.Printf("[ERROR] Failed to fetch active users: %v", err)
-                continue
-            }
-            message := Message{
-                Type:    "users_list",
-                Content: users,
-            }
-           
-            if client, ok := clients[userID]; ok {
-                err := client.WriteJSON(message)
-                if err != nil {
-                    log.Printf("[ERROR] Failed to broadcast user list: %v", err)
-                }
-            }
-        }
-        clientsMutex.RUnlock()
-        time.Sleep(30 * time.Second)
-    }
+	// Each presence change triggers one broadcast. Do not start a permanent
+	// polling loop for every connection and disconnection.
+	clientsMutex.RLock()
+	snapshot := make(map[int]*SafeConn, len(clients))
+	for userID, client := range clients {
+		snapshot[userID] = client
+	}
+	clientsMutex.RUnlock()
+	for userID, client := range snapshot {
+		users, err := getActiveUsers(database.DBInstance.DB, userID)
+		if err != nil {
+			log.Printf("[ERROR] Failed to fetch active users: %v", err)
+			continue
+		}
+		message := Message{
+			Type:    "users_list",
+			Content: users,
+		}
+
+		err = client.WriteJSON(message)
+		if err != nil {
+			log.Printf("[ERROR] Failed to broadcast user list: %v", err)
+		}
+	}
 }
 func handlePrivateMessage(senderID int, senderUsername string, content interface{}) {
 	contentMap, ok := content.(map[string]interface{})
@@ -223,17 +234,18 @@ func handlePrivateMessage(senderID int, senderUsername string, content interface
 			Type: "private_message",
 			Content: map[string]interface{}{
 				"sender_id": senderID,
-				"sender": senderUsername,
-				"message": messageContent,
+				"sender":    senderUsername,
+				"message":   messageContent,
 				"timestamp": time.Now().Format(time.RFC3339),
 			},
 		})
-		
+
 		if err != nil {
 			log.Printf("[ERROR] Failed to deliver private message to user %d: %v", int(receiverID), err)
 		}
 	}
 	clientsMutex.RUnlock()
+	go broadcastActiveUsers()
 }
 
 func getUserIDFromSession(r *http.Request) int {
@@ -266,7 +278,7 @@ func getUsernameFromSession(r *http.Request) string {
 
 func getActiveUsers(db *sql.DB, currentUserID int) ([]map[string]interface{}, error) {
 
-    rows, err := db.Query(`
+	rows, err := db.Query(`
         WITH MessageInfo AS (
             SELECT 
                 u.id,
@@ -294,15 +306,15 @@ func getActiveUsers(db *sql.DB, currentUserID int) ([]map[string]interface{}, er
 	}
 	defer rows.Close()
 
-	var users []map[string]interface{}
+	users := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var (
 			id              int
 			username        string
-			isOnline       bool
+			isOnline        bool
 			lastMessageTime sql.NullString
 		)
-		
+
 		if err := rows.Scan(&id, &username, &isOnline, &lastMessageTime); err != nil {
 			log.Printf("[WARN] Skipping user due to scan error: %v", err)
 			continue
