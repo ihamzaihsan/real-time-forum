@@ -3,7 +3,6 @@ package handlers
 import (
 	"RTF/database"
 	"encoding/json"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -35,7 +34,6 @@ func ServeMessages(w http.ResponseWriter, r *http.Request) {
 
 	currentUserId := getUserIDFromSession(r)
 	if currentUserId == 0 {
-		log.Printf("Session token: %s", r.Header.Get("Authorization"))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -45,7 +43,7 @@ func ServeMessages(w http.ResponseWriter, r *http.Request) {
         FROM messages 
         WHERE (sender_id = ? AND receiver_id = ?) 
         OR (sender_id = ? AND receiver_id = ?)
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT ? OFFSET ?
     `, currentUserId, userId, userId, currentUserId, limit, offset)
 
@@ -55,7 +53,7 @@ func ServeMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var messages []struct {
+	type messageRecord struct {
 		ID         int    `json:"id"`
 		SenderID   int    `json:"sender_id"`
 		ReceiverID int    `json:"receiver_id"`
@@ -64,15 +62,10 @@ func ServeMessages(w http.ResponseWriter, r *http.Request) {
 		IsRead     bool   `json:"is_read"`
 	}
 
+	var messages []messageRecord
+
 	for rows.Next() {
-		var msg struct {
-			ID         int    `json:"id"`
-			SenderID   int    `json:"sender_id"`
-			ReceiverID int    `json:"receiver_id"`
-			Content    string `json:"content"`
-			CreatedAt  string `json:"created_at"`
-			IsRead     bool   `json:"is_read"`
-		}
+		var msg messageRecord
 		err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.Content, &msg.CreatedAt, &msg.IsRead)
 		if err != nil {
 			continue
