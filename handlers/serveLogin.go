@@ -29,19 +29,7 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var userEmail string
-	err := database.DBInstance.DB.QueryRow(
-		"SELECT email FROM users WHERE username = ? OR email = ?",
-		loginReq.Username, loginReq.Username,
-	).Scan(&userEmail)
-	if err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-		return
-	}
-
-	
 	loginReq.Username = strings.TrimSpace(loginReq.Username)
-	loginReq.Password = strings.TrimSpace(loginReq.Password)
 
 	if loginReq.Username == "" || loginReq.Password == "" {
 		http.Error(w, "Username and password are required", http.StatusBadRequest)
@@ -53,7 +41,7 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		Password string
 		Email    string
 	}
-	err = database.DBInstance.DB.QueryRow(
+	err := database.DBInstance.DB.QueryRow(
 		"SELECT id, password, email FROM users WHERE username = ? OR email = ?",
 		loginReq.Username, loginReq.Username,
 	).Scan(&user.ID, &user.Password, &user.Email)
@@ -70,13 +58,12 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 	var sessionCount int
 	err = database.DBInstance.DB.QueryRow(
 		"SELECT COUNT(*) FROM sessions WHERE email = ? AND expires_at > ?",
-		userEmail, time.Now(),
+		user.Email, time.Now(),
 	).Scan(&sessionCount)
 	if err == nil && sessionCount > 0 {
 		http.Error(w, "User is already logged in", http.StatusBadRequest)
 		return
 	}
-
 
 	sessionToken := uuid.New().String()
 
@@ -104,7 +91,7 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    sessionToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   r.TLS != nil,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
@@ -113,6 +100,6 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Login successful",
 		"token":   sessionToken,
-		"user_id": user.ID, 
+		"user_id": user.ID,
 	})
 }

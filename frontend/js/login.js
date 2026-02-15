@@ -1,63 +1,22 @@
-import { displayErrors } from './router.js';
+﻿import { displayErrors } from './router.js';
+import { api } from './ui.js';
 
 export async function handleLoginSubmit(event) {
     event.preventDefault();
-
-    const loginData = {
-        username: document.getElementById('username').value.trim(),
-        password: document.getElementById('password').value.trim()
-    };
-
-    // Validation
-    const errors = [];
-    if (!loginData.username) {
-        errors.push('Username or email is required.');
-    }
-    if (!loginData.password) {
-        errors.push('Password is required.');
-    }
-
-    if (errors.length > 0) {
-        displayErrors(errors);
-        return;
-    }
-
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const username = form.elements.username.value.trim();
+    const password = form.elements.password.value;
+    if (!username || !password) { displayErrors(['Username and password are required.']); return; }
+    button.disabled = true;
     try {
-    const response = await fetch('/login', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(loginData)
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.log('Login response not OK:', {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText
-        });
-        displayErrors([errorText]);
-        return;
-    }
-
-    const result = await response.json();
-    console.log('Login success response:', result);
-
-    localStorage.clear();
-    localStorage.setItem('sessionToken', result.token);
-    localStorage.setItem('username', loginData.username);
-    localStorage.setItem('userId', result.user_id.toString());
-    if (window.wsClient) {
-        window.wsClient.connect();
-    }
-
-    window.location.href = '/';
-    
-} catch (error) {
-    console.log('Login error details:', error);
-    displayErrors(['Error during login. Please try again.']);
-}
-
+        const result = await api('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+        localStorage.setItem('sessionToken', result.token);
+        localStorage.setItem('userId', result.user_id);
+        // Use the canonical username even when signing in with an email address.
+        const profile = await api(`/profile/${result.user_id}`).catch(() => null);
+        localStorage.setItem('username', profile?.username || username);
+        window.location.assign('/');
+    } catch (error) { displayErrors([error.message]); }
+    finally { button.disabled = false; }
 }
