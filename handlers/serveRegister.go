@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,19 +27,22 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user.Username == "" || user.Email == "" || user.Password == "" {
-		http.Error(w, "Username, email, and password are required", http.StatusBadRequest)
-		log.Println(user.Password)
+	user.Username = strings.TrimSpace(user.Username)
+	user.Email = strings.TrimSpace(user.Email)
+	user.FirstName = strings.TrimSpace(user.FirstName)
+	user.LastName = strings.TrimSpace(user.LastName)
+	if user.Username == "" || user.Email == "" || user.FirstName == "" || user.LastName == "" {
+		http.Error(w, "Username, email, first name, and last name are required", http.StatusBadRequest)
 		return
 	}
-
-	// passwordPattern := `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$`
-	// passwordRegex := regexp.MustCompile(passwordPattern)
-
-	// if !passwordRegex.MatchString(user.Password) {
-	// 	http.Error(w, "Password must be at least 8 characters long and contain uppercase, lowercase, number and special character", http.StatusBadRequest)
-	// 	return
-	// }
+	if len([]rune(user.Password)) < 8 || len(user.Password) > 72 {
+		http.Error(w, "Password must contain at least 8 characters and no more than 72 bytes", http.StatusBadRequest)
+		return
+	}
+	if user.Gender != "male" && user.Gender != "female" {
+		http.Error(w, "Please select a gender", http.StatusBadRequest)
+		return
+	}
 
 	emailPattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
 	emailRegex := regexp.MustCompile(emailPattern)
@@ -108,11 +112,10 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		Value:    sessionToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   r.TLS != nil,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
-
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{

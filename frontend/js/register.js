@@ -1,73 +1,26 @@
-import { displayErrors } from './router.js';
-import { handleLoginSubmit } from './login.js';
-
+﻿import { displayErrors } from './router.js';
+import { api } from './ui.js';
 
 export async function handleRegisterSubmit(event) {
     event.preventDefault();
-
-    const userData = {
-        username: document.getElementById('username').value.trim(),
-        email: document.getElementById('email').value.trim(),
-        password: document.getElementById('password').value.trim(),
-        first_name: document.getElementById('first_name').value.trim(),
-        last_name: document.getElementById('last_name').value.trim(),
-        age: parseInt(document.getElementById('age').value, 10),
-        gender: document.querySelector('input[name="gender"]:checked').value
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const fields = form.elements;
+    const user = {
+        username: fields.username.value.trim(), email: fields.email.value.trim(),
+        password: fields.password.value, first_name: fields.first_name.value.trim(),
+        last_name: fields.last_name.value.trim(), age: Number(fields.age.value), gender: fields.gender.value,
     };
-
-    
-    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\W).{8,}$/;
-    const errors = [];
-
-    
-    if (!userData.username) {
-        errors.push('Username is required.');
-    }
-    if (!emailPattern.test(userData.email)) {
-        errors.push('Invalid email format.');
-    }
-    // if (!passwordPattern.test(userData.password)) {
-    //     errors.push('Password must be at least 8 characters long, include one uppercase letter, one lowercase letter, and one special character.');
-    // }
-    if (isNaN(userData.age) || userData.age <= 0) {
-        errors.push('Age must be a positive number.');
-    }
-    if (!userData.gender) {
-        errors.push('Gender is required.');
-    }
-
-    
-    if (errors.length > 0) {
-        displayErrors(errors);
-        return;
-    }
-
-
+    if (!user.username || !user.first_name || !user.last_name || !user.gender) { displayErrors(['Please complete all the fields.']); return; }
+    if (user.password.length < 8 || new TextEncoder().encode(user.password).length > 72) { displayErrors(['Use a password of at least 8 characters and no more than 72 bytes.']); return; }
+    if (!Number.isInteger(user.age) || user.age < 1 || user.age > 120) { displayErrors(['Enter an age between 1 and 120.']); return; }
+    button.disabled = true;
     try {
-        const response = await fetch('/register', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(userData)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            displayErrors([errorText]);
-            return;
-        }
-        const result = await response.json();
+        const result = await api('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(user) });
         localStorage.setItem('sessionToken', result.token);
         localStorage.setItem('userId', result.user_id);
-        
-        document.getElementById('registerForm').style.display = 'none';
-        
-    
-            window.location.href = '/';
-        
-    } catch (error) {
-        alert('Error during registration: ' + error);
-    }
+        localStorage.setItem('username', user.username);
+        window.location.assign('/');
+    } catch (error) { displayErrors([error.message]); }
+    finally { button.disabled = false; }
 }
