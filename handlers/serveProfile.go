@@ -5,18 +5,20 @@ import (
 	"RTF/models"
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"strings"
 )
 
 func ServeProfile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Vary", "Accept")
+	w.Header().Set("Cache-Control", "no-store")
 	acceptHeader := r.Header.Get("Accept")
 	isBrowserRequest := strings.Contains(acceptHeader, "text/html")
 
 	if isBrowserRequest {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
 		return
 	}
-
 
 	userID := strings.TrimPrefix(r.URL.Path, "/profile/")
 	var profile models.UserProfile

@@ -5,19 +5,22 @@ import (
 	"RTF/models"
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"strings"
 )
 
 func ServePostByID(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Vary", "Accept")
+	w.Header().Set("Cache-Control", "no-store")
 	acceptHeader := r.Header.Get("Accept")
 	isBrowserRequest := strings.Contains(acceptHeader, "text/html")
 
 	if isBrowserRequest {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
 		return
 	}
 
-    postID := strings.TrimPrefix(r.URL.Path, "/post/")
+	postID := strings.TrimPrefix(r.URL.Path, "/post/")
 
 	rows, err := database.DBInstance.DB.Query(`
         SELECT p.id, p.title, p.content, u.username, p.created_at,

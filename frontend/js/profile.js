@@ -1,31 +1,19 @@
-export async function loadProfileData(userId) {
-    try {
-        const response = await fetch(`/profile/${userId}`, {
-            headers: {
-                'Authorization': localStorage.getItem('sessionToken'),
-                'Accept': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to fetch profile data');
-        }
+﻿import { api, initials, showToast } from './ui.js';
 
-        const profileData = await response.json();
-        
-        
-        const initials = `${profileData.first_name[0]}${profileData.last_name[0]}`.toUpperCase();
-        document.getElementById('profileAvatar').textContent = initials;
-        
-        
-        document.getElementById('fullName').textContent = 
-            `${profileData.first_name} ${profileData.last_name}`;
-        document.getElementById('username').textContent = profileData.username;
-        document.getElementById('profileEmail').textContent = profileData.email;
-        document.getElementById('profileAge').textContent = profileData.age;
-        document.getElementById('profileGender').textContent = profileData.gender;
-        
+export async function loadProfileData(userId) {
+    const avatar = document.getElementById('profileAvatar');
+    try {
+        const profile = await api(`/profile/${userId}`);
+        if (document.getElementById('profileAvatar') !== avatar) return;
+        avatar.textContent = initials(`${profile.first_name} ${profile.last_name}`);
+        document.getElementById('fullName').textContent = `${profile.first_name} ${profile.last_name}`;
+        document.getElementById('username').textContent = `@${profile.username}`;
+        document.getElementById('profileEmail').textContent = profile.email;
+        document.getElementById('profileAge').textContent = profile.age;
+        document.getElementById('profileGender').textContent = profile.gender;
     } catch (error) {
-        console.error('Error loading profile:', error);
+        if (document.getElementById('profileAvatar') !== avatar) return;
+        document.getElementById('fullName').textContent = 'Profile unavailable';
+        showToast(error.message);
     }
 }

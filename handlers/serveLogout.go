@@ -7,9 +7,13 @@ import (
 )
 
 func ServeLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	sessionToken := r.Header.Get("Authorization")
 	if sessionToken == "" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -30,11 +34,10 @@ func ServeLogout(w http.ResponseWriter, r *http.Request) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   r.TLS != nil,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Unix(0, 0),
 	})
 
-
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	w.WriteHeader(http.StatusNoContent)
 }
