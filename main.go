@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 )
 
 func serveStaticFiles() {
+	http.HandleFunc("/favicon.svg", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./frontend/favicon.svg")
+	})
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("./frontend/css"))))
 	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("./frontend/js"))))
 }
@@ -29,7 +33,11 @@ func main() {
 
 	routes.InitRoutes()
 
-	port := ":8080"
+	portNumber := os.Getenv("PORT")
+	if portNumber == "" {
+		portNumber = "8080"
+	}
+	port := ":" + portNumber
 	fmt.Println("Server started at http://localhost" + port)
 	log.Fatal(http.ListenAndServe(port, nil))
 }

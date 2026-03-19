@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/mattn/go-sqlite3" 
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type DataBase struct {
@@ -25,27 +25,26 @@ func InitDB() error {
 		return fmt.Errorf("error pinging database: %v", err)
 	}
 
-
 	_, err = DBInstance.DB.Exec("PRAGMA foreign_keys = ON;")
 	if err != nil {
 		return fmt.Errorf("error enabling foreign keys: %v", err)
 	}
 
-
 	err = CreateTables(DBInstance.DB)
 	if err != nil {
 		return fmt.Errorf("error creating tables: %v", err)
 	}
-	
-	AddDefaultCategories(DBInstance.DB)
+
+	if err := AddDefaultCategories(DBInstance.DB); err != nil {
+		return fmt.Errorf("error adding default categories: %v", err)
+	}
 
 	return nil
 }
 
 func CreateTables(db *sql.DB) error {
-	
-	
-createUsersTable := `
+
+	createUsersTable := `
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
@@ -60,20 +59,16 @@ CREATE TABLE IF NOT EXISTS users (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );`
 
-
-	
 	if _, err := db.Exec(createUsersTable); err != nil {
 		return fmt.Errorf("failed to create users table: %v", err)
 	}
 
-	
 	createCategoriesTable := `
     CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE
     );`
 
-	
 	if _, err := db.Exec(createCategoriesTable); err != nil {
 		return fmt.Errorf("failed to create categories table: %v", err)
 	}
@@ -90,10 +85,10 @@ CREATE TABLE IF NOT EXISTS users (
     );`
 
 	if _, err := db.Exec(createPostsTable); err != nil {
-    return fmt.Errorf("failed to create posts table: %v", err)
+		return fmt.Errorf("failed to create posts table: %v", err)
 	}
 
-        createPostCategoriesTable := `
+	createPostCategoriesTable := `
         CREATE TABLE IF NOT EXISTS post_categories (
             post_id INTEGER,
             category_id INTEGER,
@@ -102,11 +97,10 @@ CREATE TABLE IF NOT EXISTS users (
             FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
         );`
 
-	
 	if _, err := db.Exec(createPostCategoriesTable); err != nil {
-    return fmt.Errorf("failed to create post_categories table: %v", err)
+		return fmt.Errorf("failed to create post_categories table: %v", err)
 	}
-	
+
 	createCommentsTable := `
     CREATE TABLE IF NOT EXISTS comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -118,12 +112,10 @@ CREATE TABLE IF NOT EXISTS users (
         FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
     );`
 
-	
 	if _, err := db.Exec(createCommentsTable); err != nil {
 		return fmt.Errorf("failed to create comments table: %v", err)
 	}
 
-	
 	createLikesTable := `
     CREATE TABLE IF NOT EXISTS likes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,8 +134,7 @@ CREATE TABLE IF NOT EXISTS users (
 		return fmt.Errorf("failed to create likes table: %v", err)
 	}
 
-	
-createMessagesTable := `
+	createMessagesTable := `
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sender_id INTEGER NOT NULL,
@@ -155,12 +146,10 @@ CREATE TABLE IF NOT EXISTS messages (
     FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE
 );`
 
-if _, err := db.Exec(createMessagesTable); err != nil {
-    return fmt.Errorf("failed to create messages table: %v", err)
-}
+	if _, err := db.Exec(createMessagesTable); err != nil {
+		return fmt.Errorf("failed to create messages table: %v", err)
+	}
 
-
-	
 	createSessionTable := `
     CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,19 +159,18 @@ if _, err := db.Exec(createMessagesTable); err != nil {
         FOREIGN KEY (email) REFERENCES users (email) ON DELETE CASCADE
     );`
 
-
 	if _, err := db.Exec(createSessionTable); err != nil {
 		return fmt.Errorf("failed to create sessions table: %v", err)
 	}
 
-	return nil 
+	return nil
 }
 
 func AddDefaultCategories(db *sql.DB) error {
 
 	categories := []string{"science", "technology", "art", "sport", "games"}
 
-	stmt, err := db.Prepare("INSERT INTO categories (name) VALUES (?)")
+	stmt, err := db.Prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)")
 	if err != nil {
 		return err
 	}
