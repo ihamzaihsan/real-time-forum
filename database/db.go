@@ -3,6 +3,10 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -14,32 +18,101 @@ type DataBase struct {
 var DBInstance DataBase
 
 func InitDB() error {
-	var err error
-	DBInstance.DB, err = sql.Open("sqlite3", "Real-Time-Forum.db")
+	path := os.Getenv("DATABASE_PATH")
+	if path == "" {
+		path = "Real-Time-Forum.db"
+	}
+	db, err := Open(path)
 	if err != nil {
-		return fmt.Errorf("error opening database: %v", err)
+		return err
 	}
-
-	err = DBInstance.DB.Ping()
-	if err != nil {
-		return fmt.Errorf("error pinging database: %v", err)
-	}
-
-	_, err = DBInstance.DB.Exec("PRAGMA foreign_keys = ON;")
-	if err != nil {
-		return fmt.Errorf("error enabling foreign keys: %v", err)
-	}
-
-	err = CreateTables(DBInstance.DB)
-	if err != nil {
-		return fmt.Errorf("error creating tables: %v", err)
-	}
-
-	if err := AddDefaultCategories(DBInstance.DB); err != nil {
-		return fmt.Errorf("error adding default categories: %v", err)
-	}
-
+	DBInstance.DB = db
 	return nil
+}
+
+// Open configures every pooled connection through the driver DSN.
+func Open(path string) (*sql.DB, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Dir(abs), 0700); err != nil {
+		return nil, err
+	}
+	uriPath := filepath.ToSlash(abs)
+	if !strings.HasPrefix(uriPath, "/") {
+		uriPath = "/" + uriPath
+	}
+	dsn := (&url.URL{Scheme: "file", Path: uriPath}).String() + "?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL&_txlock=immediate"
+	db, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
+	for _, initialize := range []func(*sql.DB) error{(*sql.DB).Ping, CreateTables, AddDefaultCategories, migrate} {
+		if err := initialize(db); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
+	return db, nil
+}
+
+func migrate(db *sql.DB) error {
+	// A nullable composite UNIQUE constraint does not prevent duplicate reactions.
+	// Keep the newest record before adding partial unique indexes to existing DBs.
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	columns, err := tx.Query(`PRAGMA table_info(messages)`)
+	if err != nil {
+		return err
+	}
+	hasClientID := false
+	for columns.Next() {
+		var cid, notNull, primaryKey int
+		var name, dataType string
+		var defaultValue interface{}
+		if err := columns.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &primaryKey); err != nil {
+			columns.Close()
+			return err
+		}
+		if name == "client_id" {
+			hasClientID = true
+		}
+	}
+	err = columns.Err()
+	columns.Close()
+	if err != nil {
+		return err
+	}
+	if !hasClientID {
+		if _, err := tx.Exec(`ALTER TABLE messages ADD COLUMN client_id TEXT`); err != nil {
+			return err
+		}
+	}
+	statements := []string{
+		`CREATE UNIQUE INDEX IF NOT EXISTS messages_client_unique ON messages(sender_id, client_id) WHERE client_id IS NOT NULL`,
+		`DELETE FROM likes WHERE post_id IS NOT NULL AND id NOT IN (SELECT MAX(id) FROM likes WHERE post_id IS NOT NULL GROUP BY user_id, post_id)`,
+		`DELETE FROM likes WHERE comment_id IS NOT NULL AND id NOT IN (SELECT MAX(id) FROM likes WHERE comment_id IS NOT NULL GROUP BY user_id, comment_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS likes_post_unique ON likes(user_id, post_id) WHERE post_id IS NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS likes_comment_unique ON likes(user_id, comment_id) WHERE comment_id IS NOT NULL`,
+		`CREATE INDEX IF NOT EXISTS messages_conversation ON messages(sender_id, receiver_id, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS posts_created ON posts(created_at DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id, created_at DESC)`,
+		`CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE, reason TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, post_id))`,
+		`UPDATE users SET is_online = FALSE`,
+		`CREATE TABLE IF NOT EXISTS moderation_actions (id INTEGER PRIMARY KEY AUTOINCREMENT, moderator_id INTEGER NOT NULL REFERENCES users(id), post_id INTEGER NOT NULL, action TEXT NOT NULL, reason TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate database: %w", err)
+		}
+	}
+	return tx.Commit()
 }
 
 func CreateTables(db *sql.DB) error {
