@@ -1,38 +1,25 @@
 package handlers
 
 import (
-	database "RTF/database"
-	"log"
+	"database/sql"
+	"errors"
 	"net/http"
 	"time"
 )
 
 func CheckAuth(w http.ResponseWriter, r *http.Request) {
-	CleanExpiredSessions()
-	cookie, err := r.Cookie("session_token")
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
-
-	var expiresAt time.Time
-	err = database.DBInstance.DB.QueryRow(
-		"SELECT expires_at FROM sessions WHERE session_token = ?",
-		cookie.Value,
-	).Scan(&expiresAt)
-
-	if err != nil || time.Now().After(expiresAt) {
-		database.DBInstance.DB.Exec("DELETE FROM sessions WHERE session_token = ?", cookie.Value)
-		http.Error(w, "Session expired", http.StatusUnauthorized)
+	s, err := lookupSession(requestToken(r))
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			serverError(w, err)
+			return
+		}
+		setSessionCookie(w, r, "", time.Unix(1, 0))
+		http.Error(w, "Sign in to continue", http.StatusUnauthorized)
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-func CleanExpiredSessions() {
-	_, err := database.DBInstance.DB.Exec("DELETE FROM sessions WHERE expires_at < ?", time.Now())
-	if err != nil {
-		log.Printf("Error cleaning expired sessions: %v", err)
-	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"user_id": s.UserID, "username": s.Username, "is_admin": isAdmin(s.UserID)})
 }

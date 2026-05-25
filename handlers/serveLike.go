@@ -1,94 +1,67 @@
 package handlers
 
 import (
-    "RTF/database"
-    "encoding/json"
-    "net/http"
-    "strconv"
+	"RTF/database"
+	"database/sql"
+	"errors"
+	"net/http"
+	"strconv"
 )
 
-func ServeLike(w http.ResponseWriter, r *http.Request) {
-    if r.Method != http.MethodPost {
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-        return
-    }
-
-    sessionToken := r.Header.Get("Authorization")
-    if sessionToken == "" {
-        http.Redirect(w, r, "/login", http.StatusSeeOther)
-        return
-    }
-
-    var userID int
-    err := database.DBInstance.DB.QueryRow(
-        "SELECT u.id FROM users u JOIN sessions s ON u.email = s.email WHERE s.session_token = ?",
-        sessionToken,
-    ).Scan(&userID)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-
-    postID, err := strconv.Atoi(r.FormValue("post_id"))
-    if err != nil {
-        http.Error(w, "Invalid post ID", http.StatusBadRequest)
-        return
-    }
-
-    isLike, err := strconv.ParseBool(r.FormValue("is_like"))
-    if err != nil {
-        http.Error(w, "Invalid like value", http.StatusBadRequest)
-        return
-    }
-
-    var existingIsLike bool
-    err = database.DBInstance.DB.QueryRow(
-        "SELECT is_like FROM likes WHERE user_id = ? AND post_id = ?",
-        userID, postID,
-    ).Scan(&existingIsLike)
-
-    if err == nil {
-        _, err = database.DBInstance.DB.Exec(
-            "UPDATE likes SET is_like = ? WHERE user_id = ? AND post_id = ?",
-            isLike, userID, postID,
-        )
-    } else {
-        _, err = database.DBInstance.DB.Exec(
-            "INSERT INTO likes (user_id, post_id, is_like) VALUES (?, ?, ?)",
-            userID, postID, isLike,
-        )
-    }
-
-    if err != nil {
-        http.Error(w, "Database error", http.StatusInternalServerError)
-        return
-    }
-
-    var likesCount, dislikesCount int
-    err = database.DBInstance.DB.QueryRow(
-        "SELECT COUNT(*) FROM likes WHERE post_id = ? AND is_like = true", postID,
-    ).Scan(&likesCount)
-    if err != nil {
-        http.Error(w, "Database error", http.StatusInternalServerError)
-        return
-    }
-
-    err = database.DBInstance.DB.QueryRow(
-        "SELECT COUNT(*) FROM likes WHERE post_id = ? AND is_like = false", postID,
-    ).Scan(&dislikesCount)
-    if err != nil {
-        http.Error(w, "Database error", http.StatusInternalServerError)
-        return
-    }
-
-    response := struct {
-        Likes    int `json:"likes"`
-        Dislikes int `json:"dislikes"`
-    }{
-        Likes:    likesCount,
-        Dislikes: dislikesCount,
-    }
-
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(response)
+func ServeLike(w http.ResponseWriter, r *http.Request) { serveReaction(w, r, "post") }
+func serveReaction(w http.ResponseWriter, r *http.Request, kind string) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+	s, ok := requireSession(w, r)
+	if !ok {
+		return
+	}
+	if !parseForm(w, r) {
+		return
+	}
+	column, table := kind+"_id", kind+"s"
+	id, err := positiveID(r.FormValue(column))
+	if err != nil {
+		http.Error(w, "Invalid target ID", http.StatusBadRequest)
+		return
+	}
+	like, err := strconv.ParseBool(r.FormValue("is_like"))
+	if err != nil {
+		http.Error(w, "Invalid reaction", http.StatusBadRequest)
+		return
+	}
+	tx, err := database.DBInstance.DB.Begin()
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	defer tx.Rollback()
+	var target int
+	err = tx.QueryRow("SELECT id FROM "+table+" WHERE id=?", id).Scan(&target)
+	if errors.Is(err, sql.ErrNoRows) {
+		http.Error(w, "Content not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	_, err = tx.Exec("INSERT INTO likes(user_id,"+column+",is_like) VALUES(?,?,?) ON CONFLICT(user_id,"+column+") WHERE "+column+" IS NOT NULL DO UPDATE SET is_like=excluded.is_like", s.UserID, id, like)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	var likes, dislikes int
+	if err := tx.QueryRow("SELECT COALESCE(SUM(is_like=1),0),COALESCE(SUM(is_like=0),0) FROM likes WHERE "+column+"=?", id).Scan(&likes, &dislikes); err != nil {
+		serverError(w, err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		serverError(w, err)
+		return
+	}
+	result := map[string]interface{}{"kind": kind, "id": id, "likes": likes, "dislikes": dislikes}
+	broadcastMessage(Message{Type: "reaction_updated", Content: result})
+	writeJSON(w, http.StatusOK, result)
 }

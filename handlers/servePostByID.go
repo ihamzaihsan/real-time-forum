@@ -2,59 +2,38 @@ package handlers
 
 import (
 	"RTF/database"
-	"RTF/models"
-	"encoding/json"
 	"net/http"
-	"path/filepath"
 	"strings"
 )
 
 func ServePostByID(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Vary", "Accept")
-	w.Header().Set("Cache-Control", "no-store")
-	acceptHeader := r.Header.Get("Accept")
-	isBrowserRequest := strings.Contains(acceptHeader, "text/html")
-
-	if isBrowserRequest {
-		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
-
-	postID := strings.TrimPrefix(r.URL.Path, "/post/")
-
-	rows, err := database.DBInstance.DB.Query(`
-        SELECT p.id, p.title, p.content, u.username, p.created_at,
-        (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND is_like = 1) AS likes,
-        (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND is_like = 0) AS dislikes,
-        COALESCE(GROUP_CONCAT(c.name), '') AS categories
-        FROM posts p
-        JOIN users u ON p.user_id = u.id
-        LEFT JOIN post_categories pc ON p.id = pc.post_id
-        LEFT JOIN categories c ON pc.category_id = c.id
-        WHERE p.id = ?
-        GROUP BY p.id
-    `, postID)
+	id, err := positiveID(strings.TrimPrefix(r.URL.Path, "/post/"))
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		http.Error(w, "Invalid post ID", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Vary", "Accept")
+	if strings.Contains(r.Header.Get("Accept"), "text/html") {
+		serveShell(w, r)
+		return
+	}
+	rows, err := database.DBInstance.DB.Query(postSelect+" WHERE p.id=?", id)
+	if err != nil {
+		serverError(w, err)
 		return
 	}
 	defer rows.Close()
-
-	var post models.Post
-	var categoriesStr string
-
-	if !rows.Next() {
+	posts, err := readPosts(rows)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if len(posts) == 0 {
 		http.Error(w, "Post not found", http.StatusNotFound)
 		return
 	}
-	if err := rows.Scan(&post.ID, &post.Title, &post.Content, &post.Username, &post.CreatedAt, &post.Likes, &post.Dislikes, &categoriesStr); err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
-	}
-	if categoriesStr != "" {
-		post.Categories = strings.Split(categoriesStr, ",")
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(post)
+	writeJSON(w, http.StatusOK, posts[0])
 }

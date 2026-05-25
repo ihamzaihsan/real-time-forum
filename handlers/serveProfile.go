@@ -3,36 +3,37 @@ package handlers
 import (
 	"RTF/database"
 	"RTF/models"
-	"encoding/json"
 	"net/http"
-	"path/filepath"
 	"strings"
 )
 
 func ServeProfile(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Vary", "Accept")
-	w.Header().Set("Cache-Control", "no-store")
-	acceptHeader := r.Header.Get("Accept")
-	isBrowserRequest := strings.Contains(acceptHeader, "text/html")
-
-	if isBrowserRequest {
-		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
-
-	userID := strings.TrimPrefix(r.URL.Path, "/profile/")
-	var profile models.UserProfile
-	err := database.DBInstance.DB.QueryRow(
-		`SELECT first_name, last_name, username, email, age, gender 
-		FROM users WHERE id = ?`, userID).Scan(
-		&profile.FirstName, &profile.LastName, &profile.Username,
-		&profile.Email, &profile.Age, &profile.Gender)
-
+	id, err := positiveID(strings.TrimPrefix(r.URL.Path, "/profile/"))
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(profile)
+	w.Header().Set("Vary", "Accept")
+	if strings.Contains(r.Header.Get("Accept"), "text/html") {
+		serveShell(w, r)
+		return
+	}
+	s, ok := requireSession(w, r)
+	if !ok {
+		return
+	}
+	if s.UserID != id {
+		http.Error(w, "You can only view your own profile", http.StatusForbidden)
+		return
+	}
+	var profile models.UserProfile
+	err = database.DBInstance.DB.QueryRow("SELECT first_name,last_name,username,email,age,gender FROM users WHERE id=?", id).Scan(&profile.FirstName, &profile.LastName, &profile.Username, &profile.Email, &profile.Age, &profile.Gender)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, profile)
 }

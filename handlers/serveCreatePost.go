@@ -2,89 +2,89 @@ package handlers
 
 import (
 	"RTF/database"
-	"RTF/models"
-	"encoding/json"
-	"log"
+	"database/sql"
+	"errors"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 )
 
 func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet, http.MethodPost) {
+		return
+	}
 	if r.Method == http.MethodGet {
-		http.ServeFile(w, r, filepath.Join("frontend", "index.html"))
+		serveShell(w, r)
 		return
 	}
-
-	var post models.Post
-	if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
+	s, ok := requireSession(w, r)
+	if !ok {
 		return
 	}
-
-	post.Title = strings.TrimSpace(post.Title)
-	post.Content = strings.TrimSpace(post.Content)
-	if post.Title == "" || post.Content == "" {
-		http.Error(w, "Title and content are required", http.StatusBadRequest)
+	var input struct {
+		Title      string   `json:"title"`
+		Content    string   `json:"content"`
+		Categories []string `json:"categories"`
+	}
+	if !decodeJSON(w, r, &input) {
 		return
 	}
-	if len([]rune(post.Title)) > 200 {
-		http.Error(w, "Title must be 200 characters or less", http.StatusBadRequest)
+	input.Title = strings.TrimSpace(input.Title)
+	input.Content = strings.TrimSpace(input.Content)
+	if input.Title == "" || len([]rune(input.Title)) > 200 || input.Content == "" || len([]rune(input.Content)) > 2000 {
+		http.Error(w, "Use a title of 1–200 characters and content of 1–2,000 characters", http.StatusBadRequest)
 		return
 	}
-
-	if len([]rune(post.Content)) > 2000 {
-		http.Error(w, "Content must be 2000 characters or less", http.StatusBadRequest)
+	if len(input.Categories) < 1 || len(input.Categories) > 5 {
+		http.Error(w, "Choose 1–5 distinct categories", http.StatusBadRequest)
 		return
 	}
-
-	if len(post.Categories) == 0 {
-		http.Error(w, "At least one category is required", http.StatusBadRequest)
-		return
-	}
-
-	userID := getUserIDFromSession(r)
-	if userID == 0 {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	post.CreatedAt = time.Now()
-
-	result, err := database.DBInstance.DB.Exec(
-		"INSERT INTO posts (title, content, user_id, created_at) VALUES (?, ?, ?, ?)",
-		post.Title, post.Content, userID, post.CreatedAt,
-	)
+	tx, err := database.DBInstance.DB.Begin()
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		log.Printf("Database error 2: %v", err)
+		serverError(w, err)
 		return
 	}
-
-	postID, err := result.LastInsertId()
-	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		log.Printf("Database error 3: %v", err)
-		return
-	}
-
-	for _, category := range post.Categories {
-		_, err := database.DBInstance.DB.Exec(
-			"INSERT INTO post_categories (post_id, category_id) VALUES (?, (SELECT id FROM categories WHERE name = ?))",
-			postID, category,
-		)
+	defer tx.Rollback()
+	categoryIDs := []int{}
+	seen := map[string]bool{}
+	for _, category := range input.Categories {
+		if seen[category] {
+			http.Error(w, "Duplicate category", http.StatusBadRequest)
+			return
+		}
+		seen[category] = true
+		var id int
+		err := tx.QueryRow("SELECT id FROM categories WHERE name=?", category).Scan(&id)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Unknown category", http.StatusBadRequest)
+			return
+		}
 		if err != nil {
-			http.Error(w, "Database error", http.StatusInternalServerError)
-			log.Printf("Database error 4: %v", err)
+			serverError(w, err)
+			return
+		}
+		categoryIDs = append(categoryIDs, id)
+	}
+	result, err := tx.Exec("INSERT INTO posts(title,content,user_id,created_at) VALUES(?,?,?,?)", input.Title, input.Content, s.UserID, time.Now().UTC())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	for _, categoryID := range categoryIDs {
+		if _, err := tx.Exec("INSERT INTO post_categories(post_id,category_id) VALUES(?,?)", id, categoryID); err != nil {
+			serverError(w, err)
 			return
 		}
 	}
-
-	go broadcastMessage(Message{Type: "new_post", Content: map[string]interface{}{"post_id": postID}})
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "Post created successfully",
-		"post_id": postID,
-	})
+	if err := tx.Commit(); err != nil {
+		serverError(w, err)
+		return
+	}
+	broadcastMessage(Message{Type: "new_post", Content: map[string]interface{}{"post_id": id}})
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"post_id": id})
 }
