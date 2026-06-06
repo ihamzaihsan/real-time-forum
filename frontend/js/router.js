@@ -1,7 +1,8 @@
+import { reportPost, renderModeration } from './moderation.js';
 import { handleRegisterSubmit } from './register.js';
 import { handleLoginSubmit } from './login.js';
 import { handleCreatePost } from './createPost.js';
-import { renderCommentSection, initializeComments } from './comments.js';
+import { renderCommentSection, initializeComments, refreshComments } from './comments.js';
 import { handleLike } from './likes.js';
 import { loadProfileData } from './profile.js';
 import { deletePost } from './deletePost.js';
@@ -13,6 +14,10 @@ let searchQuery = '';
 let sortOrder = 'newest';
 let feed = [];
 let renderVersion = 0;
+let feedOffset = 0;
+let feedTotal = 0;
+let feedRequest = 0;
+let searchTimer;
 
 export function navigate(path) {
     window.history.pushState({}, '', path);
@@ -21,12 +26,12 @@ export function navigate(path) {
 
 async function renderContent(path) {
     const version = ++renderVersion;
-    const authenticated = Boolean(localStorage.getItem('sessionToken'));
+    const authenticated = Boolean(localStorage.getItem('userId'));
     if (path === '/profile') path = `/profile/${localStorage.getItem('userId') || ''}`;
     if (path === '/logout') { await logout(); return; }
     const authPage = path === '/login' || path === '/register';
     if (authenticated && authPage) { navigate('/'); return; }
-    const privatePage = path === '/chat' || path === '/create_post' || path.startsWith('/profile/');
+    const privatePage = path === '/chat' || path === '/create_post' || path.startsWith('/profile/') || path === '/moderation';
     if (!authenticated && privatePage) { navigate('/login'); return; }
     document.body.classList.toggle('auth-page', authPage);
     document.body.classList.toggle('chat-page', path === '/chat');
@@ -37,6 +42,7 @@ async function renderContent(path) {
     if (path === '/login') loginContent();
     else if (path === '/register') registerContent();
     else if (path === '/chat') chatContent();
+    else if (path === '/moderation') await renderModeration();
     else if (path === '/create_post') await createPostContent(version);
     else if (/^\/profile\/\d+$/.test(path)) profileContent(path.split('/')[2]);
     else if (/^\/post\/\d+$/.test(path)) await singlePostContent(path.split('/')[2], version);
@@ -44,8 +50,9 @@ async function renderContent(path) {
 }
 
 function updateNavigation(path = window.location.pathname) {
-    const authenticated = Boolean(localStorage.getItem('sessionToken'));
+    const authenticated = Boolean(localStorage.getItem('userId'));
     const userId = localStorage.getItem('userId');
+    document.getElementById('moderationLink').hidden = localStorage.getItem('isAdmin') !== 'true';
     const username = localStorage.getItem('username') || 'You';
     document.querySelectorAll('nav [data-route]').forEach(link => {
         const selected = link.getAttribute('href') === path || (link.id === 'profileLink' && path.startsWith('/profile'));
@@ -76,17 +83,17 @@ async function homeContent(version) {
         <div class="feed-controls"><div id="topicFilters" class="filter-tabs" aria-label="Filter discussions by topic"></div><span id="feedCount" class="muted"></span></div>
         <div id="searchSummary" class="search-summary" hidden></div>
         <div id="posts-container" class="posts-list" aria-live="polite"><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
+        <div id="feedPagination" class="feed-pagination" aria-label="Discussion pages"></div>
         <div class="feed-end">You’re right where you belong. <span>✳</span></div>`;
     document.getElementById('feedSort').value = sortOrder;
-    document.getElementById('feedSort').addEventListener('change', event => { sortOrder = event.target.value; renderFeed(); });
+    document.getElementById('feedSort').addEventListener('change', event => { sortOrder = event.target.value; refreshFeed(true); });
     try {
-        const [posts, categories] = await Promise.all([api('/posts'), api('/categories')]);
+        const categories = await api('/categories');
         if (version !== renderVersion) return;
-        feed = Array.isArray(posts) ? posts : [];
         const topics = Array.isArray(categories) ? categories : [];
         if (activeTopic && !topics.includes(activeTopic)) activeTopic = '';
         document.getElementById('topicFilters').innerHTML = ['', ...topics].map(topic => `<button type="button" class="filter-tab" data-topic="${esc(topic)}" aria-pressed="${topic === activeTopic}">${esc(topic || 'All discussions')}</button>`).join('');
-        renderFeed();
+        await refreshFeed(true);
     } catch (error) {
         if (version === renderVersion) document.getElementById('posts-container').innerHTML = emptyState('The room is taking a moment.', error.message) + '<button class="button button-quiet" id="retryFeed">Try again</button>';
         document.getElementById('retryFeed')?.addEventListener('click', () => renderContent('/'));
@@ -97,16 +104,15 @@ function renderFeed() {
     const container = document.getElementById('posts-container');
     if (!container) return;
     const query = searchQuery.trim().toLowerCase();
-    const posts = feed.filter(post => (!activeTopic || post.categories?.includes(activeTopic)) && (!query || `${post.title} ${post.content} ${post.username}`.toLowerCase().includes(query)));
-    posts.sort((a, b) => sortOrder === 'popular' ? b.likes - a.likes || new Date(b.created_at) - new Date(a.created_at) : new Date(b.created_at) - new Date(a.created_at));
-    document.getElementById('feedCount').textContent = `${posts.length} discussion${posts.length === 1 ? '' : 's'}`;
+    const posts = feed;
+    document.getElementById('feedCount').textContent = `${feedTotal} discussion${feedTotal === 1 ? '' : 's'}`;
     document.querySelectorAll('[data-topic]').forEach(button => {
         button.classList.toggle('active', button.dataset.topic === activeTopic);
         button.setAttribute('aria-pressed', String(button.dataset.topic === activeTopic));
     });
     const summary = document.getElementById('searchSummary');
     summary.hidden = !query;
-    summary.textContent = `Results for “${searchQuery.trim()}” in the latest discussions`;
+    summary.textContent = `Results for “${searchQuery.trim()}” across discussions`;
     container.innerHTML = posts.length ? posts.map(post => `
         <article class="post-card" data-post-id="${Number(post.id)}">
             <div class="post-author"><span class="avatar avatar-soft tone-${Number(post.id) % 4}">${esc(initials(post.username))}</span><div><strong>${esc(post.username)}</strong><span>${esc(dateLabel(post.created_at))} <span class="meta-dot">·</span> Shared a thought</span></div><span class="post-category">${esc(post.categories?.[0] || 'Discussion')}</span></div>
@@ -116,18 +122,56 @@ function renderFeed() {
         </article>`).join('') : emptyState(query || activeTopic ? 'No conversations here yet.' : 'Every community starts with a hello.', query || activeTopic ? 'Try another topic or search, or start a discussion of your own.' : 'Share a question, an idea, or something you’ve been thinking about.') + '<a href="/create_post" data-route class="button button-dark empty-cta">Start a discussion ' + icon('plus') + '</a>';
 }
 
-export async function refreshFeed() {
-    if (!document.getElementById('posts-container')) return;
-    const posts = await api('/posts');
-    if (!document.getElementById('posts-container')) return;
-    feed = Array.isArray(posts) ? posts : [];
-    renderFeed();
+export async function refreshFeed(reset = false) {
+    const container = document.getElementById('posts-container');
+    if (!container) return;
+    if (reset) feedOffset = 0;
+    const request = ++feedRequest;
+    const parameters = new URLSearchParams({ q: searchQuery.trim(), category: activeTopic, sort: sortOrder, limit: '10', offset: String(feedOffset) });
+    container.setAttribute('aria-busy', 'true');
+    try {
+        const result = await api(`/posts?${parameters}`);
+        if (request !== feedRequest || document.getElementById('posts-container') !== container) return;
+        feed = result.posts;
+        feedTotal = result.total;
+        if (feedOffset >= feedTotal && feedOffset > 0) { feedOffset = Math.max(0, Math.ceil(feedTotal / 10) - 1) * 10; return refreshFeed(); }
+        renderFeed();
+        const pagination = document.getElementById('feedPagination');
+        pagination.innerHTML = `<button type="button" class="button button-quiet" id="previousPage" ${feedOffset === 0 ? 'disabled' : ''}>Previous</button><span>Page ${Math.floor(feedOffset / 10) + 1} of ${Math.max(1, Math.ceil(feedTotal / 10))}</span><button type="button" class="button button-quiet" id="nextPage" ${feedOffset + 10 >= feedTotal ? 'disabled' : ''}>Next</button>`;
+        document.getElementById('previousPage').addEventListener('click', () => { feedOffset = Math.max(0, feedOffset - 10); refreshFeed(); });
+        document.getElementById('nextPage').addEventListener('click', () => { feedOffset += 10; refreshFeed(); });
+    } catch (error) {
+        if (request !== feedRequest || document.getElementById('posts-container') !== container) return;
+        container.innerHTML = emptyState('Could not load discussions.', error.message) + '<button type="button" class="button button-quiet" id="retryFeed">Try again</button>';
+        document.getElementById('feedPagination').innerHTML = '';
+        document.getElementById('retryFeed').addEventListener('click', () => refreshFeed());
+    } finally { if (request === feedRequest && container.isConnected) container.removeAttribute('aria-busy'); }
 }
 
 function selectTopic(topic) {
     activeTopic = topic;
     if (window.location.pathname !== '/') navigate('/');
-    else renderFeed();
+    else refreshFeed(true);
+}
+
+export async function refreshCurrentPage() {
+    if (document.getElementById('posts-container')) return refreshFeed();
+    const id = window.location.pathname.match(/^\/post\/(\d+)$/)?.[1];
+    const article = document.getElementById('post-content');
+    if (!id || !article) return;
+    try {
+        const post = await api(`/post/${id}`);
+        if (document.getElementById('post-content') !== article) return;
+        const likes = article.querySelector('.likes-count');
+        const dislikes = article.querySelector('.dislikes-count');
+        if (likes) likes.textContent = post.likes;
+        if (dislikes) dislikes.textContent = post.dislikes;
+        await refreshComments(id);
+    } catch (error) {
+        if (document.getElementById('post-content') !== article) return;
+        if (error.status === 404) { showToast('This discussion has been removed.'); navigate('/'); }
+        else showToast(error.message);
+    }
 }
 
 function pageHeading(kicker, title, detail) {
@@ -148,11 +192,18 @@ async function createPostContent(version) {
 
 async function singlePostContent(postId, version) {
     document.getElementById('content').innerHTML = '<a href="/" data-route class="back-link">' + icon('back') + ' Back to discussions</a><article id="post-content" class="post-detail"><div class="skeleton-card"></div></article><div id="comments-section"></div>';
+    document.getElementById('post-content').dataset.postId = postId;
     try {
         const post = await api(`/post/${postId}`);
         if (version !== renderVersion) return;
-        const authenticated = Boolean(localStorage.getItem('sessionToken'));
-        document.getElementById('post-content').innerHTML = `<div class="post-author"><span class="avatar avatar-soft">${esc(initials(post.username))}</span><div><strong>${esc(post.username)}</strong><span>${esc(dateLabel(post.created_at))}</span></div></div><h1>${esc(post.title)}</h1><div class="post-content">${esc(post.content)}</div><div class="post-categories">${(post.categories || []).map(category => `<span class="category">${esc(category)}</span>`).join('')}</div><div class="post-footer"><div class="post-reactions"><button class="reaction-btn" data-like="${Number(post.id)}" aria-label="Like discussion">${icon('up')}<span class="likes-count">${post.likes || 0}</span></button><button class="reaction-btn" data-dislike="${Number(post.id)}" aria-label="Dislike discussion">${icon('down')}<span class="dislikes-count">${post.dislikes || 0}</span></button></div>${post.username === localStorage.getItem('username') ? `<button class="button button-quiet delete-btn" id="deleteDiscussion">${icon('trash')} Delete</button>` : ''}</div>`;
+        const authenticated = Boolean(localStorage.getItem('userId'));
+        document.getElementById('post-content').innerHTML = `<div class="post-author"><span class="avatar avatar-soft">${esc(initials(post.username))}</span><div><strong>${esc(post.username)}</strong><span>${esc(dateLabel(post.created_at))}</span></div></div><h1>${esc(post.title)}</h1><div class="post-content">${esc(post.content)}</div><div class="post-categories">${(post.categories || []).map(category => `<span class="category">${esc(category)}</span>`).join('')}</div><div class="post-footer"><div class="post-reactions"><button class="reaction-btn" data-like="${Number(post.id)}" aria-label="Like discussion">${icon('up')}<span class="likes-count">${post.likes || 0}</span></button><button class="reaction-btn" data-dislike="${Number(post.id)}" aria-label="Dislike discussion">${icon('down')}<span class="dislikes-count">${post.dislikes || 0}</span></button></div>${Number(post.user_id) === Number(localStorage.getItem('userId')) ? `<button class="button button-quiet delete-btn" id="deleteDiscussion">${icon('trash')} Delete</button>` : ''}</div>`;
+        if (authenticated) {
+            const report = document.createElement('button');
+            report.type = 'button'; report.className = 'button button-quiet'; report.textContent = 'Report discussion';
+            report.addEventListener('click', () => reportPost(post.id));
+            document.getElementById('post-content').append(report);
+        }
         document.getElementById('deleteDiscussion')?.addEventListener('click', event => deletePost(post.id, event));
         document.getElementById('comments-section').innerHTML = renderCommentSection(authenticated);
         initializeComments(postId);
@@ -191,7 +242,8 @@ async function logout() {
     try {
         await api('/logout', { method: 'POST' });
         window.wsClient?.disconnect();
-        ['sessionToken', 'userId', 'username'].forEach(key => localStorage.removeItem(key));
+        ['sessionToken', 'userId', 'username', 'isAdmin'].forEach(key => localStorage.removeItem(key));
+        window.wsClient?.connect();
         navigate('/');
     } catch (error) { showToast(error.message); }
 }
@@ -213,7 +265,7 @@ export function initRouter() {
         if (topic) { selectTopic(topic.dataset.topic); return; }
         const reaction = event.target.closest('[data-like], [data-dislike]');
         if (reaction) {
-            if (!localStorage.getItem('sessionToken')) { navigate('/login'); return; }
+            if (!localStorage.getItem('userId')) { navigate('/login'); return; }
             handleLike(Number(reaction.dataset.like || reaction.dataset.dislike), Boolean(reaction.dataset.like));
             return;
         }
@@ -224,7 +276,10 @@ export function initRouter() {
     });
     window.addEventListener('popstate', () => renderContent(window.location.pathname));
     const search = document.getElementById('globalSearch');
-    search.addEventListener('input', () => { searchQuery = search.value; if (window.location.pathname !== '/') navigate('/'); else renderFeed(); });
+    search.addEventListener('input', () => {
+        searchQuery = search.value; clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => { if (window.location.pathname !== '/') navigate('/'); else refreshFeed(true); }, 250);
+    });
     document.addEventListener('keydown', event => {
         if (event.key === '/' && !event.target.closest('input, textarea, select, [contenteditable]')) { event.preventDefault(); search.focus(); }
     });

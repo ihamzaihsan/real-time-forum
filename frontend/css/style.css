@@ -1,4 +1,5 @@
 /* Yaplane: a small, dependency-free design system. */
+.feed-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 24px 0; font-size: 12px; }
 :root {
     --canvas: #f6f5f1;
     --surface: #fff;

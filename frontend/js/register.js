@@ -17,7 +17,8 @@ export async function handleRegisterSubmit(event) {
     button.disabled = true;
     try {
         const result = await api('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(user) });
-        localStorage.setItem('sessionToken', result.token);
+        localStorage.removeItem('sessionToken');
+        localStorage.setItem('isAdmin', String(result.is_admin));
         localStorage.setItem('userId', result.user_id);
         localStorage.setItem('username', user.username);
         window.location.assign('/');

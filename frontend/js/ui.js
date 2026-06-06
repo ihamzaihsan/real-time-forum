@@ -47,10 +47,12 @@ export function timeLabel(value) {
 export async function api(path, options = {}) {
     const headers = new Headers(options.headers);
     headers.set('Accept', 'application/json');
-    const token = localStorage.getItem('sessionToken');
-    if (token) headers.set('Authorization', token);
     const response = await fetch(path, { ...options, headers });
-    if (!response.ok) throw new Error((await response.text()).trim() || 'Something went wrong. Please try again.');
+    if (!response.ok) {
+        const error = new Error((await response.text()).trim() || 'Something went wrong. Please try again.');
+        error.status = response.status;
+        throw error;
+    }
     if (response.status === 204) return null;
     const text = await response.text();
     return text ? JSON.parse(text) : null;

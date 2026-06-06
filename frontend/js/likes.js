@@ -6,12 +6,12 @@ async function react(kind, id, isLike) {
     const key = `${kind}:${id}`;
     if (pendingReactions.has(key)) return;
     pendingReactions.add(key);
-    const body = new FormData();
+    const body = new URLSearchParams();
     body.set(kind === 'post' ? 'post_id' : 'comment_id', id);
     body.set('is_like', String(isLike));
     try {
         const result = await api(kind === 'post' ? '/like' : '/comment/like', { method: 'POST', body });
-        const selector = kind === 'post' ? `[data-post-id="${id}"], #post-content` : `[data-comment-id="${id}"]`;
+        const selector = kind === 'post' ? `[data-post-id="${id}"]` : `[data-comment-id="${id}"]`;
         document.querySelectorAll(selector).forEach(node => {
             const likes = node.querySelector('.likes-count');
             const dislikes = node.querySelector('.dislikes-count');

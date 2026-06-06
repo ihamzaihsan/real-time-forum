@@ -3,7 +3,12 @@ import { navigate } from './router.js';
 
 let chatVersion = 0;
 let loading = false;
-let historyOffset = 0;
+let historyBefore = 0;
+let historyRequest = 0;
+
+export function refreshCurrentChat(wsClient) {
+    if (wsClient.currentChatUser && document.getElementById('messageHistory')) return loadMessages(wsClient, wsClient.currentChatUser);
+}
 
 function createMessageElement(message) {
     const node = document.createElement('div');
@@ -22,32 +27,33 @@ function createMessageElement(message) {
 
 export function appendMessage(message) {
     const history = document.getElementById('messageHistory');
-    if (!history) return;
+    if (!history || (message.id && history.querySelector(`[data-message-id="${Number(message.id)}"]`))) return;
     history.querySelector('.empty-state')?.remove();
     history.append(createMessageElement(message));
-    historyOffset++;
     history.scrollTop = history.scrollHeight;
 }
 
 async function loadMessages(wsClient, userId, older = false) {
     if (loading && older) return;
     const version = chatVersion;
+    const request = ++historyRequest;
     const history = document.getElementById('messageHistory');
     if (!history) return;
     loading = true;
     if (!older) {
-        historyOffset = 0;
+        historyBefore = 0;
         history.innerHTML = '<div class="empty-state"><p>Opening your conversation…</p></div>';
     }
     const loadButton = history.querySelector('.chat-load-more');
     if (loadButton) loadButton.disabled = true;
     const oldHeight = history.scrollHeight;
     try {
-        const messages = await api(`/messages/${userId}?offset=${historyOffset}&limit=10`);
-        if (version !== chatVersion || Number(wsClient.currentChatUser) !== Number(userId)) return;
+        const messages = await api(`/messages/${userId}?limit=10${older && historyBefore ? `&before=${historyBefore}` : ""}`);
+        if (version !== chatVersion || request !== historyRequest || Number(wsClient.currentChatUser) !== Number(userId)) return;
         const list = Array.isArray(messages) ? messages : [];
-        historyOffset += list.length;
+        if (list.length) historyBefore = Math.min(...list.map(message => Number(message.id)));
         const hasOlderMessages = list.length === 10;
+        const liveMessages = older ? [] : Array.from(history.querySelectorAll('.message'));
         if (!older) history.innerHTML = '';
         history.querySelector('.chat-load-more')?.remove();
         const fragment = document.createDocumentFragment();
@@ -56,6 +62,9 @@ async function loadMessages(wsClient, userId, older = false) {
         });
         if (older) history.prepend(fragment);
         else history.append(fragment);
+        for (const node of liveMessages) {
+            if (!history.querySelector(`[data-message-id="${Number(node.dataset.messageId)}"]`)) history.append(node);
+        }
         if (!history.querySelector('.message')) history.innerHTML = emptyState('This is the start of something.', 'Say hello. Your conversation begins here.');
         if (hasOlderMessages) {
             const button = document.createElement('button');
@@ -67,11 +76,11 @@ async function loadMessages(wsClient, userId, older = false) {
         }
         history.scrollTop = older ? history.scrollHeight - oldHeight : history.scrollHeight;
     } catch (error) {
-        if (version !== chatVersion) return;
+        if (version !== chatVersion || request !== historyRequest) return;
         if (!older) history.innerHTML = emptyState('Couldn’t load the conversation.', error.message);
         else showToast(error.message);
     } finally {
-        if (version === chatVersion) { loading = false; if (loadButton) loadButton.disabled = false; }
+        if (version === chatVersion && request === historyRequest) { loading = false; if (loadButton) loadButton.disabled = false; }
     }
 }
 
@@ -83,14 +92,14 @@ function updateChatHeader(wsClient) {
     if (!heading) return;
     heading.textContent = name;
     document.getElementById('chatAvatar').textContent = initials(name);
-    document.getElementById('chatStatus').textContent = user?.isOnline ? 'Here now · Say hello' : 'Away · You can still read your conversation';
+    document.getElementById('chatStatus').textContent = user?.isOnline ? 'Here now · Say hello' : 'Away · Messages will be saved for their return';
     const form = document.getElementById('messageForm');
     form.hidden = false;
-    const available = Boolean(user?.isOnline && wsClient.socket?.readyState === WebSocket.OPEN);
-    form.querySelector('button').disabled = !available;
+    const available = Boolean(user && wsClient.socket?.readyState === WebSocket.OPEN);
+    form.querySelector('button').disabled = !available || wsClient.pending.size > 0;
     const input = document.getElementById('messageInput');
     input.disabled = !available;
-    input.placeholder = available ? 'Say something kind…' : 'Messaging is available when you’re both online';
+    input.placeholder = available ? (user?.isOnline ? 'Say something kind…' : 'Send a message for when they return…') : 'Reconnect to send a message';
 }
 
 export function updateUsersList(wsClient, users) {
@@ -131,25 +140,32 @@ export function initializeChat(wsClient) {
     }
     const form = document.getElementById('messageForm');
     const input = document.getElementById('messageInput');
-    form.addEventListener('submit', event => {
+    form.addEventListener('submit', async event => {
         event.preventDefault();
         const text = input.value.trim();
         if (!text || !wsClient.currentChatUser) return;
-        if (wsClient.socket?.readyState !== WebSocket.OPEN || !wsClient.onlineUsers.get(wsClient.currentChatUser)) {
-            showToast('Reconnect and wait for your friend to come online.');
+        if (wsClient.socket?.readyState !== WebSocket.OPEN) {
+            showToast('Reconnect before sending.');
             return;
         }
-        wsClient.socket.send(JSON.stringify({ type: 'private_message', content: { receiver_id: wsClient.currentChatUser, message: text } }));
-        appendMessage({ sender_id: Number(localStorage.getItem('userId')), content: text, timestamp: new Date() });
-        input.value = '';
-        sendTyping(false);
+        const button = form.querySelector('button');
+        const recipient = wsClient.currentChatUser;
+        const version = chatVersion;
+        button.disabled = true;
+        try {
+            await wsClient.sendPrivateMessage(recipient, text);
+            if (version === chatVersion && input.value.trim() === text) input.value = '';
+            if (version === chatVersion) sendTyping(false);
+        } catch (error) { showToast(error.message); }
+        finally { if (version === chatVersion) button.disabled = wsClient.socket?.readyState !== WebSocket.OPEN; }
     });
     let typingTimer;
     const sendTyping = typing => {
         if (wsClient.socket?.readyState === WebSocket.OPEN && wsClient.currentChatUser) wsClient.socket.send(JSON.stringify({ type: 'typing_status', content: { receiver_id: wsClient.currentChatUser, isTyping: typing } }));
     };
+    let lastTyping = 0;
     input.addEventListener('input', () => {
-        sendTyping(Boolean(input.value.trim()));
+        if (Date.now() - lastTyping > 700) { sendTyping(Boolean(input.value.trim())); lastTyping = Date.now(); }
         clearTimeout(typingTimer);
         const recipient = wsClient.currentChatUser;
         typingTimer = setTimeout(() => {

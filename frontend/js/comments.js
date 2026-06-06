@@ -6,6 +6,20 @@ export async function loadComments(postId) {
     return Array.isArray(comments) ? comments : [];
 }
 
+export async function refreshComments(postId) {
+    const list = document.getElementById('commentsList');
+    if (!list) return;
+    const request = Number(list.dataset.request || 0) + 1;
+    list.dataset.request = request;
+    let comments;
+    try { comments = await loadComments(postId); }
+    catch (error) {
+        if (document.getElementById('commentsList') === list && Number(list.dataset.request) === request) throw error;
+        return;
+    }
+    if (document.getElementById('commentsList') === list && Number(list.dataset.request) === request) renderComments(comments);
+}
+
 export function renderCommentSection(authenticated = true) {
     return `<section class="comments-section"><h2>Keep the conversation going.</h2>${authenticated ? `<form id="commentForm" class="comment-form"><label for="commentContent">Your reply <span class="field-hint">200 characters max</span></label><textarea id="commentContent" name="comment" placeholder="Add your perspective…" maxlength="200" required></textarea><button type="submit" class="button button-dark">Post reply ${icon('arrow')}</button><div id="commentError" role="alert" class="field-help"></div></form>` : '<p class="field-help"><a href="/login" data-route class="text-link">Log in to add your perspective ↗</a></p>'}<div id="commentsList" class="comments-list" aria-live="polite"><p class="muted">Loading replies…</p></div></section>`;
 }
@@ -20,8 +34,7 @@ export async function initializeComments(postId) {
     async function refresh() {
         const version = ++refreshVersion;
         try {
-            const comments = await loadComments(postId);
-            if (isCurrent() && version === refreshVersion) renderComments(comments);
+            await refreshComments(postId);
             return true;
         } catch (error) {
             if (!isCurrent() || version !== refreshVersion) return false;
@@ -71,7 +84,7 @@ export function renderComments(comments) {
     if (!list) return;
     list.innerHTML = comments.length ? comments.map(comment => `<article class="comment" data-comment-id="${Number(comment.id)}"><div class="comment-header"><span class="avatar avatar-soft">${esc(initials(comment.username))}</span><strong>${esc(comment.username || 'Community member')}</strong><span class="comment-date">${esc(dateLabel(comment.created_at))}</span></div><p class="comment-content">${esc(comment.content)}</p><div class="comment-actions"><button class="reaction-btn" data-comment-like="${Number(comment.id)}" aria-label="Like reply">${icon('up')}<span class="likes-count">${comment.likes || 0}</span></button><button class="reaction-btn" data-comment-dislike="${Number(comment.id)}" aria-label="Dislike reply">${icon('down')}<span class="dislikes-count">${comment.dislikes || 0}</span></button></div></article>`).join('') : emptyState('Be the first to add a thought.', 'The best conversations have more than one perspective.');
     list.querySelectorAll('[data-comment-like], [data-comment-dislike]').forEach(button => button.addEventListener('click', () => {
-        if (!localStorage.getItem('sessionToken')) { showToast('Log in to react to replies.'); return; }
+        if (!localStorage.getItem('userId')) { showToast('Log in to react to replies.'); return; }
         handleCommentLike(Number(button.dataset.commentLike || button.dataset.commentDislike), Boolean(button.dataset.commentLike));
     }));
 }

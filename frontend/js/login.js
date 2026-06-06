@@ -11,7 +11,8 @@ export async function handleLoginSubmit(event) {
     button.disabled = true;
     try {
         const result = await api('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
-        localStorage.setItem('sessionToken', result.token);
+        localStorage.removeItem('sessionToken');
+        localStorage.setItem('isAdmin', String(result.is_admin));
         localStorage.setItem('userId', result.user_id);
         // Use the canonical username even when signing in with an email address.
         const profile = await api(`/profile/${result.user_id}`).catch(() => null);
