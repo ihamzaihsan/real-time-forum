@@ -1,0 +1,8 @@
+.git
+Real-Time-Forum.db*
+*.db
+*.db-*
+*.exe
+.env
+.env.*
+README.md
