@@ -4,7 +4,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/yaplane .
+    CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/yaplane . && \
+    CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/seed-demo ./cmd/seed-demo
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
@@ -14,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && mkdir /data && chown yaplane:yaplane /data
 WORKDIR /app
 COPY --from=build /out/yaplane /app/yaplane
+COPY --from=build /out/seed-demo /app/seed-demo
 COPY frontend /app/frontend
 ENV PORT=8080 DATABASE_PATH=/data/forum.db
 USER yaplane
