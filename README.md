@@ -28,7 +28,7 @@ The frontend needs no framework, npm install, or build step. Database transactio
 
 ## Run locally
 
-Install Docker with Compose support. From the repository root:
+Install Docker with Compose support and start Docker. From the repository root, run the commands below. For demo accounts, skip this startup and use **Start with demo content** instead:
 
 ```sh
 docker compose up --build -d
@@ -50,13 +50,21 @@ go run -ldflags="-s -w" .
 
 The native server also defaults to port **8080**.
 
-## Optional demo content
+## Start with demo content
 
 For a populated demo, run these commands **instead of the first startup command above**, before a database exists in the Docker volume:
 
 ```sh
 docker compose build
 docker compose run --rm forum /app/seed-demo
+docker compose up -d
+```
+
+**Git Bash on Windows:**
+
+```bash
+docker compose build
+MSYS_NO_PATHCONV=1 docker compose run --rm forum /app/seed-demo
 docker compose up -d
 ```
 
