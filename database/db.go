@@ -50,7 +50,7 @@ func Open(path string) (*sql.DB, error) {
 	}
 	db.SetMaxOpenConns(4)
 	db.SetMaxIdleConns(4)
-	for _, initialize := range []func(*sql.DB) error{(*sql.DB).Ping, CreateTables, AddDefaultCategories, migrate} {
+	for _, initialize := range []func(*sql.DB) error{(*sql.DB).Ping, CreateTables, migrate, migrateExtensions, AddDefaultCategories, migrateNotifications} {
 		if err := initialize(db); err != nil {
 			db.Close()
 			return nil, err
@@ -240,21 +240,24 @@ CREATE TABLE IF NOT EXISTS messages (
 }
 
 func AddDefaultCategories(db *sql.DB) error {
-
-	categories := []string{"science", "technology", "art", "sport", "games"}
-
-	stmt, err := db.Prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)")
+	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
-
-	for _, category := range categories {
-		_, err := stmt.Exec(category)
-		if err != nil {
-
+	defer tx.Rollback()
+	var count int
+	if err = tx.QueryRow("SELECT COUNT(*) FROM forum_settings WHERE name='default_topics_seeded'").Scan(&count); err != nil {
+		return err
+	}
+	if count == 0 {
+		for _, name := range []string{"science", "technology", "art", "sport", "games"} {
+			if _, err = tx.Exec("INSERT OR IGNORE INTO categories(name) VALUES(?)", name); err != nil {
+				return err
+			}
+		}
+		if _, err = tx.Exec("INSERT INTO forum_settings(name,value) VALUES('default_topics_seeded','true')"); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
