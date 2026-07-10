@@ -16,7 +16,7 @@ import (
 
 // Middleware applies browser protections and bounded, process-local rate limits.
 func Middleware(next http.Handler) http.Handler {
-	general := newRateLimiter(240, time.Minute)
+	general := newRateLimiter(600, time.Minute)
 	auth := newRateLimiter(20, 15*time.Minute)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -24,6 +24,9 @@ func Middleware(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		w.Header().Set("Cache-Control", "no-store")
+		if r.TLS != nil {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && !sameOrigin(r) {
 			http.Error(w, "Cross-origin requests are not allowed", http.StatusForbidden)
 			return
@@ -42,7 +45,11 @@ func Middleware(next http.Handler) http.Handler {
 			http.Error(w, "Too many requests. Try again later.", http.StatusTooManyRequests)
 			return
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+		limit := int64(16 * 1024)
+		if r.URL.Path == "/create_post" {
+			limit = maxUploadRequest
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -52,9 +59,16 @@ func sameOrigin(r *http.Request) bool {
 		return false
 	}
 	origin := r.Header.Get("Origin")
+	if origin == "" && r.Header.Get("Referer") != "" {
+		referer, err := url.Parse(r.Header.Get("Referer"))
+		if err != nil {
+			return false
+		}
+		origin = referer.Scheme + "://" + referer.Host
+	}
 	if origin == "" {
-		return true
-	} // CLI clients do not send Origin.
+		return false
+	}
 	expected := os.Getenv("PUBLIC_ORIGIN")
 	if expected == "" {
 		scheme := "http"
