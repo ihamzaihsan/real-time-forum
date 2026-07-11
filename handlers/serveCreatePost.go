@@ -4,6 +4,7 @@ import (
 	"RTF/database"
 	"database/sql"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -26,7 +27,25 @@ func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
 		Content    string   `json:"content"`
 		Categories []string `json:"categories"`
 	}
-	if !decodeJSON(w, r, &input) {
+	var attachment *multipart.FileHeader
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		err := r.ParseMultipartForm(1 << 20)
+		if r.MultipartForm != nil {
+			defer r.MultipartForm.RemoveAll()
+		}
+		if err != nil {
+			http.Error(w, "Invalid upload; images must be at most 20 MiB", http.StatusRequestEntityTooLarge)
+			return
+		}
+		input.Title, input.Content, input.Categories = r.FormValue("title"), r.FormValue("content"), r.MultipartForm.Value["categories"]
+		for field, files := range r.MultipartForm.File {
+			if field != "image" || len(files) != 1 {
+				http.Error(w, "Supply at most one image", 400)
+				return
+			}
+			attachment = files[0]
+		}
+	} else if !decodeJSON(w, r, &input) {
 		return
 	}
 	input.Title = strings.TrimSpace(input.Title)
@@ -65,7 +84,31 @@ func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
 		}
 		categoryIDs = append(categoryIDs, id)
 	}
-	result, err := tx.Exec("INSERT INTO posts(title,content,user_id,created_at) VALUES(?,?,?,?)", input.Title, input.Content, s.UserID, time.Now().UTC())
+	imageName, err := saveImage(attachment)
+	if err != nil {
+		var invalid *imageInputError
+		if errors.As(err, &invalid) {
+			http.Error(w, invalid.Error(), http.StatusBadRequest)
+		} else if errors.Is(err, errUploadBusy) {
+			w.Header().Set("Retry-After", "1")
+			http.Error(w, err.Error(), http.StatusTooManyRequests)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	saved := false
+	defer func() {
+		if !saved && imageName != "" {
+			removeUpload(imageName)
+		}
+	}()
+	status, err := submissionStatus(tx, s.UserID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	result, err := tx.Exec("INSERT INTO posts(title,content,user_id,created_at,image_path,status) VALUES(?,?,?,?,?,?)", input.Title, input.Content, s.UserID, time.Now().UTC(), imageName, status)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -85,6 +128,10 @@ func ServeCreatePost(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	broadcastMessage(Message{Type: "new_post", Content: map[string]interface{}{"post_id": id}})
-	writeJSON(w, http.StatusCreated, map[string]interface{}{"post_id": id})
+	saved = true
+	if status == "published" {
+		broadcastMessage(Message{Type: "new_post", Content: map[string]interface{}{"post_id": id}})
+	}
+	communityChanged()
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"post_id": id, "status": status})
 }
