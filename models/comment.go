@@ -3,6 +3,7 @@ package models
 import "time"
 
 type Comment struct {
+	Status    string    `json:"status"`
 	ID        int       `json:"id"`
 	PostID    int       `json:"post_id"`
 	UserID    int       `json:"user_id"`

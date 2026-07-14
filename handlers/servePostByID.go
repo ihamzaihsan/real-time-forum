@@ -20,7 +20,7 @@ func ServePostByID(w http.ResponseWriter, r *http.Request) {
 		serveShell(w, r)
 		return
 	}
-	rows, err := database.DBInstance.DB.Query(postSelect+" WHERE p.id=?", id)
+	rows, err := database.DBInstance.DB.Query(postSelect+" WHERE p.id=? AND "+visibility("p", r), id)
 	if err != nil {
 		serverError(w, err)
 		return

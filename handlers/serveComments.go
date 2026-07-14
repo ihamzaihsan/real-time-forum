@@ -29,7 +29,18 @@ func ServeCreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	created := time.Now().UTC()
-	result, err := database.DBInstance.DB.Exec("INSERT INTO comments(content,user_id,post_id,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM posts WHERE id=?)", input.Content, s.UserID, input.PostID, created, input.PostID)
+	tx, err := database.DBInstance.DB.Begin()
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	defer tx.Rollback()
+	status, err := submissionStatus(tx, s.UserID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	result, err := tx.Exec("INSERT INTO comments(content,user_id,post_id,created_at,status) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM posts WHERE id=? AND status='published')", input.Content, s.UserID, input.PostID, created, status, input.PostID)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -46,8 +57,16 @@ func ServeCreateComment(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	comment := models.Comment{ID: int(id), PostID: input.PostID, UserID: s.UserID, Username: s.Username, Content: input.Content, CreatedAt: created}
-	broadcastMessage(Message{Type: "new_comment", Content: comment})
+	if err := tx.Commit(); err != nil {
+		serverError(w, err)
+		return
+	}
+	comment := models.Comment{Status: status, ID: int(id), PostID: input.PostID, UserID: s.UserID, Username: s.Username, Content: input.Content, CreatedAt: created}
+	if status == "published" {
+		contentChanged()
+	}
+	notifyPostOwner(input.PostID)
+	communityChanged()
 	writeJSON(w, http.StatusCreated, comment)
 }
 func ServeGetComments(w http.ResponseWriter, r *http.Request) {
@@ -59,10 +78,10 @@ func ServeGetComments(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid post ID", http.StatusBadRequest)
 		return
 	}
-	rows, err := database.DBInstance.DB.Query(`SELECT c.id,c.post_id,c.content,c.user_id,u.username,c.created_at,
+	rows, err := database.DBInstance.DB.Query(`SELECT c.id,c.post_id,c.content,c.user_id,u.username,c.created_at,c.status,
  (SELECT COUNT(*) FROM likes WHERE comment_id=c.id AND is_like=1),
  (SELECT COUNT(*) FROM likes WHERE comment_id=c.id AND is_like=0)
- FROM comments c JOIN users u ON u.id=c.user_id WHERE c.post_id=? ORDER BY julianday(c.created_at) DESC,c.id DESC`, id)
+ FROM comments c JOIN users u ON u.id=c.user_id JOIN posts p ON p.id=c.post_id WHERE c.post_id=? AND `+visibility("p", r)+` AND `+visibility("c", r)+` ORDER BY julianday(c.created_at) DESC,c.id DESC`, id)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -71,7 +90,7 @@ func ServeGetComments(w http.ResponseWriter, r *http.Request) {
 	comments := make([]models.Comment, 0)
 	for rows.Next() {
 		var c models.Comment
-		if err := rows.Scan(&c.ID, &c.PostID, &c.Content, &c.UserID, &c.Username, &c.CreatedAt, &c.Likes, &c.Dislikes); err != nil {
+		if err := rows.Scan(&c.ID, &c.PostID, &c.Content, &c.UserID, &c.Username, &c.CreatedAt, &c.Status, &c.Likes, &c.Dislikes); err != nil {
 			serverError(w, err)
 			return
 		}

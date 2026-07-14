@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const postSelect = `SELECT p.id,p.user_id,p.title,p.content,u.username,p.created_at,
+const postSelect = `SELECT p.id,p.user_id,p.title,p.content,u.username,p.created_at,COALESCE(p.image_path,''),p.status,
  (SELECT COUNT(*) FROM likes WHERE post_id=p.id AND is_like=1) AS likes,
  (SELECT COUNT(*) FROM likes WHERE post_id=p.id AND is_like=0) AS dislikes,
  COALESCE((SELECT GROUP_CONCAT(c.name) FROM categories c JOIN post_categories pc ON pc.category_id=c.id WHERE pc.post_id=p.id),'')
@@ -19,7 +19,7 @@ func readPosts(rows *sql.Rows) ([]models.Post, error) {
 	for rows.Next() {
 		var p models.Post
 		var categories string
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Title, &p.Content, &p.Username, &p.CreatedAt, &p.Likes, &p.Dislikes, &categories); err != nil {
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Title, &p.Content, &p.Username, &p.CreatedAt, &p.ImagePath, &p.Status, &p.Likes, &p.Dislikes, &categories); err != nil {
 			return nil, err
 		}
 		if categories != "" {
@@ -53,7 +53,7 @@ func ServePosts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Sort must be newest or popular", http.StatusBadRequest)
 		return
 	}
-	where := ` WHERE (?='' OR instr(lower(p.title),lower(?))>0 OR instr(lower(p.content),lower(?))>0 OR instr(lower(u.username),lower(?))>0)
+	where := " WHERE " + visibility("p", r) + ` AND (?='' OR instr(lower(p.title),lower(?))>0 OR instr(lower(p.content),lower(?))>0 OR instr(lower(u.username),lower(?))>0)
  AND (?='' OR EXISTS(SELECT 1 FROM post_categories pc JOIN categories c ON c.id=pc.category_id WHERE pc.post_id=p.id AND c.name=?))`
 	args := []interface{}{query, query, query, query, category, category}
 	var total int
