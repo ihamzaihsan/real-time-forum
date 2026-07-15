@@ -147,6 +147,9 @@ func SeedDemo(db *sql.DB) ([]DemoAccount, error) {
 			messageIndex++
 		}
 	}
+	if _, err := tx.Exec("DELETE FROM notifications"); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
