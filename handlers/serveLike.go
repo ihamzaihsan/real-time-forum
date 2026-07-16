@@ -38,7 +38,11 @@ func serveReaction(w http.ResponseWriter, r *http.Request, kind string) {
 	}
 	defer tx.Rollback()
 	var target int
-	err = tx.QueryRow("SELECT id FROM "+table+" WHERE id=?", id).Scan(&target)
+	query := "SELECT id FROM " + table + " WHERE id=? AND status='published'"
+	if kind == "comment" {
+		query = "SELECT c.id FROM comments c JOIN posts p ON p.id=c.post_id WHERE c.id=? AND c.status='published' AND p.status='published'"
+	}
+	err = tx.QueryRow(query, id).Scan(&target)
 	if errors.Is(err, sql.ErrNoRows) {
 		http.Error(w, "Content not found", http.StatusNotFound)
 		return
@@ -60,6 +64,9 @@ func serveReaction(w http.ResponseWriter, r *http.Request, kind string) {
 	if err := tx.Commit(); err != nil {
 		serverError(w, err)
 		return
+	}
+	if kind == "post" {
+		notifyPostOwner(id)
 	}
 	result := map[string]interface{}{"kind": kind, "id": id, "likes": likes, "dislikes": dislikes}
 	broadcastMessage(Message{Type: "reaction_updated", Content: result})
