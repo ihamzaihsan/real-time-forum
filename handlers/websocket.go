@@ -69,6 +69,12 @@ func connectionSnapshot(userID int) []*SafeConn {
 }
 func broadcastMessage(message Message) {
 	for _, client := range connectionSnapshot(-1) {
+		if client.token != "" {
+			if _, err := lookupSession(client.token); err != nil {
+				client.conn.Close()
+				continue
+			}
+		}
 		if err := client.WriteJSON(message); err != nil {
 			client.conn.Close()
 		}
@@ -111,7 +117,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if !sameOrigin(r) {
+	if r.Header.Get("Origin") == "" || !sameOrigin(r) {
 		http.Error(w, "Cross-origin connection rejected", http.StatusForbidden)
 		return
 	}
