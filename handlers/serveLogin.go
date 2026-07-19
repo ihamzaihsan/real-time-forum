@@ -50,5 +50,5 @@ func ServeLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setSessionCookie(w, r, token, expires)
-	writeJSON(w, http.StatusOK, map[string]interface{}{"user_id": id, "username": username, "is_admin": isAdmin(id)})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"user_id": id, "username": username, "is_admin": isAdmin(id), "role": userRole(id)})
 }

@@ -60,16 +60,20 @@ func requireSession(w http.ResponseWriter, r *http.Request) (session, bool) {
 
 func secureCookie(r *http.Request) bool { return r.TLS != nil || os.Getenv("COOKIE_SECURE") == "true" }
 func setSessionCookie(w http.ResponseWriter, r *http.Request, token string, expires time.Time) {
-	http.SetCookie(w, &http.Cookie{Name: "session_token", Value: token, Path: "/", HttpOnly: true, Secure: secureCookie(r), SameSite: http.SameSiteStrictMode, Expires: expires})
+	http.SetCookie(w, &http.Cookie{Name: "session_token", Value: token, Path: "/", HttpOnly: true, Secure: secureCookie(r), SameSite: http.SameSiteLaxMode, Expires: expires})
 }
 
 func createSession(email string) (string, time.Time, error) {
-	token, expires := uuid.NewString(), time.Now().UTC().Add(24*time.Hour)
-	_, err := database.DBInstance.DB.Exec("INSERT INTO sessions(session_token,email,expires_at) VALUES(?,?,?)", token, email, expires)
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	token, expires := id.String(), time.Now().UTC().Add(24*time.Hour)
+	_, err = database.DBInstance.DB.Exec("INSERT INTO sessions(session_token,email,expires_at) VALUES(?,?,?)", token, email, expires)
 	return token, expires, err
 }
 
-func isAdmin(userID int) bool {
+func configuredAdmin(userID int) bool {
 	for _, value := range strings.Split(os.Getenv("ADMIN_USER_IDS"), ",") {
 		id, err := strconv.Atoi(strings.TrimSpace(value))
 		if err == nil && id == userID && id > 0 {
@@ -78,3 +82,5 @@ func isAdmin(userID int) bool {
 	}
 	return false
 }
+
+func isAdmin(userID int) bool { return userRole(userID) == "admin" }

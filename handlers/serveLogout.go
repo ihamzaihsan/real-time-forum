@@ -19,6 +19,6 @@ func ServeLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	closeSessionConnections(s.Token)
-	http.SetCookie(w, &http.Cookie{Name: "session_token", Value: "", Path: "/", HttpOnly: true, Secure: secureCookie(r), SameSite: http.SameSiteStrictMode, MaxAge: -1, Expires: time.Unix(1, 0)})
+	http.SetCookie(w, &http.Cookie{Name: "session_token", Value: "", Path: "/", HttpOnly: true, Secure: secureCookie(r), SameSite: http.SameSiteLaxMode, MaxAge: -1, Expires: time.Unix(1, 0)})
 	w.WriteHeader(http.StatusNoContent)
 }
