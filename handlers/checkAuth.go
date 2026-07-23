@@ -21,5 +21,5 @@ func CheckAuth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Sign in to continue", http.StatusUnauthorized)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"user_id": s.UserID, "username": s.Username, "is_admin": isAdmin(s.UserID)})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"user_id": s.UserID, "username": s.Username, "is_admin": isAdmin(s.UserID), "role": userRole(s.UserID)})
 }

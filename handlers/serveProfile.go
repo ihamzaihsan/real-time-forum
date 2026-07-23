@@ -11,6 +11,10 @@ func ServeProfile(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
+	if r.URL.Path == "/profile" {
+		serveShell(w, r)
+		return
+	}
 	id, err := positiveID(strings.TrimPrefix(r.URL.Path, "/profile/"))
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)

@@ -24,13 +24,15 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var user struct {
-		Username  string `json:"username"`
-		Email     string `json:"email"`
-		Password  string `json:"password"`
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Age       int    `json:"age"`
-		Gender    string `json:"gender"`
+		RequestModerator     bool    `json:"request_moderator"`
+		Username             string  `json:"username"`
+		Email                string  `json:"email"`
+		Password             string  `json:"password"`
+		PasswordConfirmation *string `json:"password_confirmation"`
+		FirstName            string  `json:"first_name"`
+		LastName             string  `json:"last_name"`
+		Age                  int     `json:"age"`
+		Gender               string  `json:"gender"`
 	}
 	if !decodeJSON(w, r, &user) {
 		return
@@ -43,7 +45,7 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Username must be 3–32 letters, numbers, dots, underscores, or hyphens", http.StatusBadRequest)
 		return
 	}
-	if len(user.Email) > 254 || !emailPattern.MatchString(user.Email) {
+	if !validEmail(user.Email) {
 		http.Error(w, "Enter a valid email address", http.StatusBadRequest)
 		return
 	}
@@ -59,6 +61,10 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Password must contain at least 8 characters and no more than 72 bytes", http.StatusBadRequest)
 		return
 	}
+	if user.PasswordConfirmation != nil && *user.PasswordConfirmation != user.Password {
+		http.Error(w, "Passwords do not match", 400)
+		return
+	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		serverError(w, err)
@@ -70,7 +76,7 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	result, err := tx.Exec("INSERT INTO users(username,email,password,first_name,last_name,age,gender) VALUES(?,?,?,?,?,?,?)", user.Username, user.Email, string(hash), user.FirstName, user.LastName, user.Age, user.Gender)
+	result, err := tx.Exec("INSERT INTO users(username,email,password,first_name,last_name,age,gender) SELECT ?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM users WHERE email=? COLLATE NOCASE)", user.Username, user.Email, string(hash), user.FirstName, user.LastName, user.Age, user.Gender, user.Email)
 	if err != nil {
 		var sqliteErr sqlite3.Error
 		if errors.As(err, &sqliteErr) && sqliteErr.Code == sqlite3.ErrConstraint {
@@ -80,20 +86,35 @@ func ServeRegister(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if n, _ := result.RowsAffected(); n == 0 {
+		http.Error(w, "Email already exists", 409)
+		return
+	}
 	id, err := result.LastInsertId()
 	if err != nil {
 		serverError(w, err)
 		return
 	}
-	token, expires := uuid.NewString(), time.Now().UTC().Add(24*time.Hour)
+	sessionID, err := uuid.NewRandom()
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	token, expires := sessionID.String(), time.Now().UTC().Add(24*time.Hour)
 	if _, err = tx.Exec("INSERT INTO sessions(session_token,email,expires_at) VALUES(?,?,?)", token, user.Email, expires); err != nil {
 		serverError(w, err)
 		return
+	}
+	if user.RequestModerator {
+		if _, err = tx.Exec("INSERT INTO moderator_requests(user_id,message) VALUES(?,?)", id, "Requested during registration"); err != nil {
+			serverError(w, err)
+			return
+		}
 	}
 	if err = tx.Commit(); err != nil {
 		serverError(w, err)
 		return
 	}
 	setSessionCookie(w, r, token, expires)
-	writeJSON(w, http.StatusCreated, map[string]interface{}{"user_id": id, "username": user.Username, "is_admin": isAdmin(int(id))})
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"user_id": id, "username": user.Username, "is_admin": isAdmin(int(id)), "role": userRole(int(id))})
 }
