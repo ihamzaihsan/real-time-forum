@@ -385,3 +385,5 @@ form select option { padding: 7px; border-radius: 4px; }
 @media (max-width: 700px) { .header-controls { gap: 8px; }.theme-toggle { width: 30px; height: 30px; } }
 @media (max-width: 380px) { .brand { font-size: 21px; }.header-actions .button .icon { display: none; }.header-controls { gap: 6px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+.post-image { display:block; max-width:100%; max-height:600px; object-fit:contain; border-radius:12px; margin:1rem 0; }
