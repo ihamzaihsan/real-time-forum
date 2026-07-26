@@ -1,0 +1,10 @@
+# docker compose -f compose.yaml -f compose.https.yaml up --build -d
+services:
+  forum:
+    environment:
+      PUBLIC_ORIGIN: "${PUBLIC_ORIGIN:-https://localhost:8080}"
+      COOKIE_SECURE: "true"
+      TLS_CERT_FILE: "/certs/server.crt"
+      TLS_KEY_FILE: "/certs/server.key"
+    volumes:
+      - "${TLS_CERT_DIR:-./.local}:/certs:ro"
