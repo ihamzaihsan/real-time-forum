@@ -6,3 +6,8 @@ Real-Time-Forum.db*
 .env
 .env.*
 README.md
+
+.local
+uploads
+*.crt
+*.key

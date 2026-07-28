@@ -6,3 +6,10 @@
 .env
 RTF
 data/
+
+uploads/
+.local/
+*.crt
+*.key
+
+*-uploads/
